@@ -4,6 +4,8 @@ use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::net;
 use teloxide::prelude::*;
+use teloxide::types::InlineQueryResult;
+use teloxide::types::InlineQueryResultCachedSticker;
 
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 type MyDialogue = Dialogue<ConversationState, InMemStorage<ConversationState>>;
@@ -31,30 +33,38 @@ async fn main() {
         net::client_from_env(),
     );
 
-    Dispatcher::builder(
-        bot,
-        Update::filter_message()
-            .enter_dialogue::<Message, InMemStorage<ConversationState>, ConversationState>()
-            .branch(
-                dptree::case![ConversationState::ReceiveStickerID].endpoint({
-                    let db = db.clone(); // whyyyyy
-                    move |bot, dialogue, msg| receive_sticker_id(db.clone(), bot, dialogue, msg)
-                }),
-            )
-            .branch(
-                dptree::case![ConversationState::ReceiveStickerTags { sticker_id }].endpoint({
-                    let db = db.clone();
-                    move |bot, dialogue, sticker_id, msg| {
-                        receive_sticker_tags(db.clone(), bot, dialogue, msg, sticker_id)
-                    }
-                }),
-            ),
-    )
-    .dependencies(dptree::deps![InMemStorage::<ConversationState>::new()])
-    .enable_ctrlc_handler()
-    .build()
-    .dispatch()
-    .await;
+    let message_handler = Update::filter_message()
+        .enter_dialogue::<Message, InMemStorage<ConversationState>, ConversationState>()
+        .branch(
+            dptree::case![ConversationState::ReceiveStickerID].endpoint({
+                let db = db.clone(); // whyyyyy
+                move |bot, dialogue, msg| receive_sticker_id(db.clone(), bot, dialogue, msg)
+            }),
+        )
+        .branch(
+            dptree::case![ConversationState::ReceiveStickerTags { sticker_id }].endpoint({
+                let db = db.clone();
+                move |bot, dialogue, sticker_id, msg| {
+                    receive_sticker_tags(db.clone(), bot, dialogue, msg, sticker_id)
+                }
+            }),
+        );
+
+    let inline_handler = Update::filter_inline_query().endpoint({
+        let db = db.clone();
+        move |bot, query| handler_inline_query(db.clone(), bot, query)
+    });
+
+    let handler = dptree::entry()
+        .branch(message_handler)
+        .branch(inline_handler);
+
+    Dispatcher::builder(bot, handler)
+        .dependencies(dptree::deps![InMemStorage::<ConversationState>::new()])
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
 }
 
 async fn receive_sticker_id(
@@ -124,5 +134,47 @@ async fn receive_sticker_tags(
     )
     .await?;
     dialogue.update(ConversationState::ReceiveStickerID).await?;
+    Ok(())
+}
+
+async fn handler_inline_query(
+    db: Arc<DatabaseConnection>,
+    bot: Bot,
+    query: InlineQuery,
+) -> HandlerResult {
+    let user_id = query.from.id.to_string();
+
+    // Check if query is empty
+    if query.query.is_empty() {
+        bot.answer_inline_query(query.id, vec![]).await?;
+        return Ok(());
+    }
+
+    // Split query by spaces into string vector
+    let tags: Vec<String> = query
+        .query
+        .split(" ")
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    log::info!("Got inline query: {:?}", tags);
+
+    let stickers = database::find_stickers(&db, user_id, tags).await?;
+
+    log::info!("Found stickers: {:?}", stickers);
+
+    let mut i = 0;
+    let results = stickers.iter().map(|sticker| {
+        i += 1;
+        InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
+            id: format!("{}", i),
+            sticker_file_id: sticker.clone(),
+            input_message_content: None,
+            reply_markup: None,
+        })
+    });
+
+    bot.answer_inline_query(query.id, results).await?;
+
     Ok(())
 }
