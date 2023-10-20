@@ -3,9 +3,6 @@ use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::net;
 use teloxide::prelude::*;
 
-use entity::sticker_tag;
-use sea_orm::entity::prelude::*;
-
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 type MyDialogue = Dialogue<ConversationState, InMemStorage<ConversationState>>;
 
@@ -25,9 +22,11 @@ async fn main() {
     pretty_env_logger::init();
     log::info!("Starting throw dice bot...");
 
-    let mut db = Database::connect("sqlite://bitch.db").await.unwrap();
+    let db = Database::connect("sqlite://bitch.db").await.unwrap();
 
-    database::insert_tag(&db, "one".into(), "two".into(), "three".into()).await;
+    database::insert_tag(&db, "one".into(), "two".into(), "three".into()).await.unwrap();
+
+    return;
 
     let bot = Bot::with_client(
         "6747586175:AAHv2mtzDQobtCHG7qpkspL4GbNQEfThIVc",

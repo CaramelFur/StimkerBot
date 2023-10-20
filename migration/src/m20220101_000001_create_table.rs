@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(StickerTag::StickerId).string().not_null())
                     .col(ColumnDef::new(StickerTag::UserId).string().not_null())
-                    .col(ColumnDef::new(StickerTag::TagId).string().not_null())
+                    .col(ColumnDef::new(StickerTag::TagId).integer().not_null())
                     .primary_key(
                         Index::create()
                             .col(StickerTag::StickerId)
@@ -31,9 +31,14 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Tag::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Tag::TagId).string().not_null())
-                    .col(ColumnDef::new(Tag::Tag).string().not_null())
-                    .primary_key(Index::create().col(Tag::TagId))
+                    .col(
+                        ColumnDef::new(Tag::TagId)
+                            .integer()
+                            .primary_key()
+                            .auto_increment()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Tag::Tag).string().unique_key().not_null())
                     .to_owned(),
             )
             .await?;
