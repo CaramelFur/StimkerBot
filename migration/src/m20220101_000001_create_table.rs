@@ -15,30 +15,13 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(StickerTag::StickerId).string().not_null())
                     .col(ColumnDef::new(StickerTag::UserId).string().not_null())
-                    .col(ColumnDef::new(StickerTag::TagId).integer().not_null())
+                    .col(ColumnDef::new(StickerTag::TagName).string().not_null())
                     .primary_key(
                         Index::create()
                             .col(StickerTag::StickerId)
                             .col(StickerTag::UserId)
-                            .col(StickerTag::TagId),
+                            .col(StickerTag::TagName),
                     )
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_table(
-                Table::create()
-                    .table(Tag::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Tag::TagId)
-                            .integer()
-                            .primary_key()
-                            .auto_increment()
-                            .not_null(),
-                    )
-                    .col(ColumnDef::new(Tag::Tag).string().unique_key().not_null())
                     .to_owned(),
             )
             .await?;
@@ -51,11 +34,7 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(StickerTag::Table).to_owned())
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(Tag::Table).to_owned())
-            .await?;
+            .await?;;
 
         Ok(())
     }
@@ -67,13 +46,5 @@ enum StickerTag {
 
     StickerId,
     UserId,
-    TagId,
-}
-
-#[derive(DeriveIden)]
-enum Tag {
-    Table,
-
-    TagId,
-    Tag,
+    TagName,
 }

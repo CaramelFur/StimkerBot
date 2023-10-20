@@ -1,10 +1,11 @@
 use entity::sticker_tag;
-use entity::tag;
-
 use migration::OnConflict;
+use sea_orm::DbBackend;
+use sea_orm::QueryTrait;
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
 use sea_orm::DatabaseConnection;
+use sea_orm::QuerySelect;
+use sea_orm::Set;
 
 pub async fn insert_tag(
     db: &DatabaseConnection,
@@ -12,36 +13,17 @@ pub async fn insert_tag(
     sticker_id: String,
     tag_name: String,
 ) -> Result<(), DbErr> {
-    log::debug!("insert_tag: {:?} for sticker_id: {:?} and user_id: {:?}", tag_name, sticker_id, user_id);
-
-    // Try to find existing tag ID
-    let existing_tag_id = tag::Entity::find()
-        .filter(tag::Column::Tag.eq(tag_name.clone()))
-        .one(db)
-        .await?
-        .map(|tag| tag.tag_id);
-
-    log::debug!("existing_tag_id: {:?}", existing_tag_id);
-
-    let tag_id = match existing_tag_id {
-        Some(tag_id) => tag_id,
-        None => {
-            tag::Entity::insert(tag::ActiveModel {
-                tag: Set(tag_name.clone()),
-                ..Default::default()
-            })
-            .exec(db)
-            .await?
-            .last_insert_id
-        }
-    };
-
-    log::debug!("tag_id: {:?}", tag_id);
+    log::debug!(
+        "insert_tag: {:?} for sticker_id: {:?} and user_id: {:?}",
+        tag_name,
+        sticker_id,
+        user_id
+    );
 
     let new_tag_association: sticker_tag::ActiveModel = sticker_tag::Model {
         sticker_id,
         user_id,
-        tag_id,
+        tag_name,
     }
     .into();
 
@@ -56,17 +38,31 @@ pub async fn insert_tag(
     Ok(())
 }
 
-// pub async fn find_stickers(
-//     db: &DatabaseConnection,
-//     user_id: String,
-//     tags: Vec<String>,
-// ) -> Result<Vec<String>, DbErr> {
-//     let mut query = sticker_tag::Entity::find();
+pub async fn find_stickers(
+    db: &DatabaseConnection,
+    user_id: String,
+    tags: Vec<String>,
+) -> Result<Vec<String>, DbErr> {
+    log::debug!(
+        "find_stickers: {:?} for user_id: {:?}",
+        tags,
+        user_id
+    );
 
-//     // return all sticker_ids where user_id is equal to user_id and the tag is equal to all tags
+    let query = sticker_tag::Entity::find()
+        .filter(sticker_tag::Column::UserId.contains(user_id))
+        .filter(sticker_tag::Column::TagName.is_in(tags.iter()))
+        .group_by(sticker_tag::Column::StickerId)
+        .having(Expr::expr(sticker_tag::Column::TagName.count()).gte(tags.len() as i32));
 
-//     Ok(stickers
-//         .into_iter()
-//         .map(|sticker| sticker.sticker_id)
-//         .collect())
-// }
+    let result = query
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|sticker_tag| sticker_tag.sticker_id)
+        .collect();
+
+    log::debug!("find_stickers result: {:?}", result);
+
+    Ok(result)
+}

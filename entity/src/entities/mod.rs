@@ -3,4 +3,3 @@
 pub mod prelude;
 
 pub mod sticker_tag;
-pub mod tag;
