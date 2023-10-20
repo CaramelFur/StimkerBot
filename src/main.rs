@@ -1,8 +1,8 @@
+use dotenv::dotenv;
 use sea_orm::Database;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
-use teloxide::net;
 use teloxide::prelude::*;
 use teloxide::types::InlineQueryResult;
 use teloxide::types::InlineQueryResultCachedSticker;
@@ -23,15 +23,14 @@ pub enum ConversationState {
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     pretty_env_logger::init();
-    log::info!("Starting throw dice bot...");
+
+    log::info!("Starting stimkerbot");
 
     let db = Arc::new(Database::connect("sqlite://bitch.db").await.unwrap());
 
-    let bot = Bot::with_client(
-        "6747586175:AAHv2mtzDQobtCHG7qpkspL4GbNQEfThIVc",
-        net::client_from_env(),
-    );
+    let bot = Bot::from_env();
 
     let message_handler = Update::filter_message()
         .enter_dialogue::<Message, InMemStorage<ConversationState>, ConversationState>()
