@@ -2,4 +2,5 @@
 
 pub mod prelude;
 
+pub mod sticker_stat;
 pub mod sticker_tag;
