@@ -1,8 +1,10 @@
 use dotenv::dotenv;
+use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
+use tokio::fs;
 
 mod database;
 mod dialogue;
@@ -18,7 +20,20 @@ async fn main() {
 
     log::info!("Starting stimkerbot");
 
-    let db = Arc::new(Database::connect("sqlite://bitch.db").await.unwrap());
+    let database_location =
+        std::env::var("DATABASE_LOCATION").expect("DATABASE_LOCATION must be set");
+    log::debug!("Database location: {:?}", database_location);
+
+    log::debug!("Opening/creating and migrating database");
+    fs::write(&database_location, vec![]).await.unwrap();
+    let db = Arc::new(
+        Database::connect(format!("sqlite://{}", database_location))
+            .await
+            .unwrap(),
+    );
+    Migrator::up(db.as_ref(), None).await.unwrap();
+    log::debug!("Successfully opened database");
+
     let bot = Bot::from_env();
 
     let message_receive_sticker_id_tree = dptree::case![ConversationState::ReceiveStickerID]
@@ -54,6 +69,8 @@ async fn main() {
         .branch(message_tree)
         .branch(inline_tree)
         .branch(inline_result_tree);
+
+    log::debug!("Starting dispatcher");
 
     Dispatcher::builder(bot, tree)
         .dependencies(dptree::deps![InMemStorage::<ConversationState>::new()])

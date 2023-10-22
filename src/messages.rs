@@ -20,18 +20,21 @@ pub async fn receive_sticker_id(
     }
 
     let sticker = msg.sticker().unwrap().file.clone();
+    let user_id = msg.from().unwrap().id.to_string();
 
-    let mut current_tags = database::get_tags(
-        &db,
-        msg.from().unwrap().id.to_string(),
-        sticker.unique_id.clone(),
-    )
-    .await?;
+    log::debug!(
+        "Got sticker: {:?} file: {:?} from: {:?}",
+        sticker.unique_id,
+        sticker.id,
+        user_id
+    );
+
+    let mut current_tags = database::get_tags(&db, user_id, sticker.unique_id.clone()).await?;
     current_tags.sort();
 
-    if current_tags.len() > 0 {
-        println!("Sending message");
+    log::debug!("Current tags: {:?}", current_tags);
 
+    if current_tags.len() > 0 {
         bot.send_message(
             msg.chat.id,
             format!(
@@ -45,8 +48,8 @@ pub async fn receive_sticker_id(
     bot.send_message(
       msg.chat.id,
       "Which tags do you want to apply to this sticker?\n- Make the first tag `add`, to add to existing tags\n- Make the first tag `clear`, to remove all existing tags",
-  )
-  .await?;
+    )
+    .await?;
 
     dialogue
         .update(ConversationState::ReceiveStickerTags { sticker })
@@ -62,16 +65,13 @@ pub async fn receive_sticker_tags(
     msg: Message,
     sticker: FileMeta,
 ) -> HandlerResult {
-    let user_id = msg.from().unwrap().id.to_string();
-
-    // Check if message is text
     if msg.text().is_none() {
         bot.send_message(msg.chat.id, "Please send me a space seperated list of tags")
             .await?;
         return Ok(());
     }
 
-    // Split text by spaces into string vector
+    let user_id = msg.from().unwrap().id.to_string();
     let mut tags: Vec<String> = msg
         .text()
         .unwrap()
@@ -79,11 +79,12 @@ pub async fn receive_sticker_tags(
         .map(|s| s.trim().to_string())
         .collect();
 
-    // If first tag is 'add', don't clear existing tags, and remove 'add' from tags
+    log::debug!("Got tags: {:?} from {:?}", tags, user_id);
+
     if tags[0] == "add" {
         tags.remove(0);
     } else {
-        // If first tag is not 'add', clear existing tags
+        log::debug!("Wiping tags");
         database::wipe_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     }
 
@@ -94,7 +95,6 @@ pub async fn receive_sticker_tags(
         return Ok(());
     }
 
-    // Insert new sticker tags
     database::insert_tags(
         &db,
         user_id.clone(),
@@ -104,11 +104,11 @@ pub async fn receive_sticker_tags(
     )
     .await?;
 
-    // Get all tags for this sticker
     tags = database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     tags.sort();
 
-    // Reply by joining the strings by commas
+    log::debug!("New tags for user {:?} is {:?}", user_id, tags);
+
     bot.send_message(
         msg.chat.id,
         format!("The new tags for this sticker are now: {}", tags.join(", ")),

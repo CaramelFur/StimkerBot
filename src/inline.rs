@@ -1,5 +1,6 @@
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
+use teloxide::payloads;
 use teloxide::prelude::*;
 
 use teloxide::types::InlineQueryResult;
@@ -19,10 +20,12 @@ pub async fn handler_inline_query(
     let user_id = query.from.id.to_string();
 
     // Check if query is empty
-    if query.query.is_empty() || query.query.len() < 3 {
+    if query.query.len() < 3 {
         if query.query == "*" {
             return handler_send_all(db, bot, query).await;
         }
+
+        log::debug!("Query too short: \"{:?}\" for {:?}", query.query, user_id);
 
         send_inline_results(
             &bot,
@@ -42,7 +45,7 @@ pub async fn handler_inline_query(
         .map(|s| s.trim().to_string())
         .collect();
 
-    log::info!("Got inline query: {:?}", tags);
+    log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
     let stickers = database::find_stickers(&db, user_id, tags).await?;
 
@@ -56,7 +59,7 @@ pub async fn handler_inline_query(
         return Ok(());
     }
 
-    log::info!("Found stickers: {:?}", stickers);
+    log::debug!("Found stickers: {:?}", stickers);
 
     let results = stickers.iter().map(|sticker| {
         InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
@@ -79,6 +82,8 @@ async fn handler_send_all(
 ) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
+    log::debug!("Sending all stickers for {:?}", user_id);
+
     let stickers = database::list_stickers(&db, user_id).await?;
 
     if stickers.len() == 0 {
@@ -91,7 +96,7 @@ async fn handler_send_all(
         return Ok(());
     }
 
-    log::info!("Found stickers: {:?}", stickers);
+    log::debug!("Found all stickers: {:?}", stickers);
 
     let results = stickers.iter().map(|sticker| {
         InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
@@ -109,9 +114,15 @@ pub async fn handle_inline_choice(
     db: Arc<DatabaseConnection>,
     query: ChosenInlineResult,
 ) -> HandlerResult {
-    log::info!("Chosen inline result: {:?} From: {:?}", query, query.from);
+    let user_id = query.from.id.to_string();
 
-    database::increase_sticker_stat(&db, query.from.id.to_string(), query.result_id).await?;
+    log::debug!(
+        "Chosen inline result: {:?} by user {:?}",
+        query,
+        user_id
+    );
+
+    database::increase_sticker_stat(&db, user_id, query.result_id).await?;
 
     Ok(())
 }
@@ -121,10 +132,13 @@ where
     I: Into<String>,
     R: IntoIterator<Item = InlineQueryResult>,
 {
-    bot.answer_inline_query(inline_query_id, results)
-        .cache_time(60)
-        .is_personal(true)
-        .await?;
+    <Bot as Requester>::AnswerInlineQuery::new(
+        bot.clone(),
+        payloads::AnswerInlineQuery::new(inline_query_id, results)
+            .cache_time(5)
+            .is_personal(true),
+    )
+    .await?;
 
     Ok(())
 }

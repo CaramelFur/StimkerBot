@@ -1,9 +1,9 @@
 use entity::sticker_stat;
 use entity::sticker_tag;
 use migration::OnConflict;
-use sea_orm::QueryTrait;
 use sea_orm::entity::prelude::*;
 use sea_orm::DatabaseConnection;
+use sea_orm::QueryOrder;
 use sea_orm::QuerySelect;
 
 pub async fn insert_tags(
@@ -103,11 +103,11 @@ pub async fn find_stickers(
         .filter(sticker_tag::Column::TagName.is_in(tags.iter()))
         .group_by(sticker_tag::Column::StickerId)
         .having(Expr::expr(sticker_tag::Column::TagName.count()).gte(tags.len() as i32))
+        .left_join(sticker_stat::Entity)
+        .order_by(sticker_stat::Column::Count, sea_orm::Order::Desc)
         .limit(50);
 
-    let result = query
-        .all(db)
-        .await?;
+    let result = query.all(db).await?;
 
     log::debug!("find_stickers result: {:?}", result);
 
@@ -123,10 +123,9 @@ pub async fn list_stickers(
     let query = sticker_tag::Entity::find()
         .filter(sticker_tag::Column::UserId.contains(user_id))
         .group_by(sticker_tag::Column::StickerId)
-        .join(sea_orm::JoinType::Join, sticker_tag::Relation::Stats.def())
+        .left_join(sticker_stat::Entity)
+        .order_by(sticker_stat::Column::Count, sea_orm::Order::Desc)
         .limit(50);
-
-    log::debug!("pog {:?}", query.clone().build(sea_orm::DatabaseBackend::Sqlite).to_string());
 
     let result = query.all(db).await?;
 
