@@ -2,3 +2,5 @@ target
 */target
 *.db
 .env
+build.sh
+Dockerfile
