@@ -78,6 +78,7 @@ pub async fn receive_sticker_tags(
     let mut tags: Vec<String> = msg
         .text()
         .unwrap()
+        .to_lowercase()
         .replace(",", " ")
         .split(" ")
         .map(|s| s.trim().to_string())

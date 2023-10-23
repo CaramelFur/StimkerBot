@@ -41,6 +41,8 @@ pub async fn handler_inline_query(
     // Split query by spaces into string vector
     let tags: Vec<String> = query
         .query
+        .to_lowercase()
+        .replace(",", " ")
         .split(" ")
         .map(|s| s.trim().to_string())
         .collect();
