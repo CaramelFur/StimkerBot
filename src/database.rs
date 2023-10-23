@@ -195,3 +195,33 @@ pub async fn increase_sticker_stat(
 
     Ok(())
 }
+
+pub async fn get_sticker_usage(
+    db: &DatabaseConnection,
+    user_id: String,
+    unique_sticker_id: String,
+) -> Result<i32, DbErr> {
+    log::debug!(
+        "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?}",
+        user_id,
+        unique_sticker_id
+    );
+
+    let query = sticker_stat::Entity::find()
+        .filter(sticker_stat::Column::UserId.eq(&user_id))
+        .filter(sticker_stat::Column::StickerId.eq(&unique_sticker_id));
+
+    let result = query
+        .one(db)
+        .await?
+        .map(|sticker_stat| sticker_stat.count)
+        .unwrap_or(0);
+
+    log::debug!(
+        "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?} done",
+        user_id,
+        unique_sticker_id
+    );
+
+    Ok(result)
+}

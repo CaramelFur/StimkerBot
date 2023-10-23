@@ -29,17 +29,20 @@ pub async fn receive_sticker_id(
         user_id
     );
 
-    let mut current_tags = database::get_tags(&db, user_id, sticker.unique_id.clone()).await?;
+    let mut current_tags = database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     current_tags.sort();
 
     log::debug!("Current tags: {:?}", current_tags);
+
+    let sticker_usage = database::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
     if current_tags.len() > 0 {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Your current tags for this sticker are: {}",
-                current_tags.join(", ")
+                "Your current tags for this sticker are: {}\nYou've used this sticker {} times",
+                current_tags.join(", "),
+                sticker_usage
             ),
         )
         .await?;
@@ -47,7 +50,7 @@ pub async fn receive_sticker_id(
 
     bot.send_message(
       msg.chat.id,
-      "Which tags do you want to apply to this sticker?\n- Make the first tag `add`, to add to existing tags\n- Make the first tag `clear`, to remove all existing tags\n- Start the tag with `-` to remove an existing tag",
+      "Which tags do you want to add to this sticker?\n- Make the first tag `replace`, to replace all tags\n- Make the first tag `clear`, to remove all existing tags\n- Start the tag with `-` to remove an existing tag",
     )
     .await?;
 
@@ -88,10 +91,9 @@ pub async fn receive_sticker_tags(
         return Ok(());
     }
 
-    if tags[0] == "add" {
-        tags.remove(0);
-    } else {
+    if tags[0] == "replace" || tags[0] == "clear" {
         log::debug!("Wiping tags");
+        tags.remove(0);
         database::wipe_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     }
 

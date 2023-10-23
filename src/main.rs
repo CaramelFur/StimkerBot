@@ -4,7 +4,6 @@ use sea_orm::Database;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
-use tokio::fs;
 
 mod database;
 mod dialogue;
@@ -25,7 +24,7 @@ async fn main() {
     log::debug!("Database location: {:?}", database_location);
 
     log::debug!("Opening/creating and migrating database");
-    fs::write(&database_location, vec![]).await.unwrap();
+    std::fs::OpenOptions::new().read(true).create(true).write(true).open(&database_location).unwrap();
     let db = Arc::new(
         Database::connect(format!("sqlite://{}", database_location))
             .await
