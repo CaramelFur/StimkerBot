@@ -64,6 +64,29 @@ pub async fn wipe_tags(
     Ok(())
 }
 
+pub async fn remove_tags(
+    db: &DatabaseConnection,
+    user_id: String,
+    unique_sticker_id: String,
+    tag_names: Vec<String>,
+) -> Result<(), DbErr> {
+    log::debug!(
+        "remove_tags: {:?} for sticker_id: {:?} and user_id: {:?}",
+        tag_names,
+        unique_sticker_id,
+        user_id
+    );
+
+    sticker_tag::Entity::delete_many()
+        .filter(sticker_tag::Column::StickerId.eq(unique_sticker_id))
+        .filter(sticker_tag::Column::UserId.eq(user_id))
+        .filter(sticker_tag::Column::TagName.is_in(tag_names.iter()))
+        .exec(db)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn get_tags(
     db: &DatabaseConnection,
     user_id: String,

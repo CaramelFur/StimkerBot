@@ -47,7 +47,7 @@ pub async fn receive_sticker_id(
 
     bot.send_message(
       msg.chat.id,
-      "Which tags do you want to apply to this sticker?\n- Make the first tag `add`, to add to existing tags\n- Make the first tag `clear`, to remove all existing tags",
+      "Which tags do you want to apply to this sticker?\n- Make the first tag `add`, to add to existing tags\n- Make the first tag `clear`, to remove all existing tags\n- Start the tag with `-` to remove an existing tag",
     )
     .await?;
 
@@ -75,11 +75,18 @@ pub async fn receive_sticker_tags(
     let mut tags: Vec<String> = msg
         .text()
         .unwrap()
+        .replace(",", " ")
         .split(" ")
         .map(|s| s.trim().to_string())
         .collect();
 
     log::debug!("Got tags: {:?} from {:?}", tags, user_id);
+
+    if tags[0] == "cancel" {
+        bot.send_message(msg.chat.id, "Cancelled").await?;
+        dialogue.update(ConversationState::ReceiveStickerID).await?;
+        return Ok(());
+    }
 
     if tags[0] == "add" {
         tags.remove(0);
@@ -95,14 +102,37 @@ pub async fn receive_sticker_tags(
         return Ok(());
     }
 
+    if tags.len() == 0 {
+        bot.send_message(msg.chat.id, "No tags provided").await?;
+        return Ok(());
+    }
+
+    // split the tags into add and remove
+    let remove_tags = tags
+        .iter()
+        .filter(|tag| tag.starts_with("-"))
+        .map(|tag| tag.replace("-", ""))
+        .collect::<Vec<String>>();
+
+    let add_tags = tags
+        .iter()
+        .filter(|tag| !tag.starts_with("-"))
+        .map(|tag| tag.to_string())
+        .collect::<Vec<String>>();
+
+    log::debug!("Removing tags: {:?}", remove_tags);
+    log::debug!("Adding tags: {:?}", add_tags);
+
     database::insert_tags(
         &db,
         user_id.clone(),
         sticker.unique_id.clone(),
         sticker.id.clone(),
-        tags.clone(),
+        add_tags,
     )
     .await?;
+
+    database::remove_tags(&db, user_id.clone(), sticker.unique_id.clone(), remove_tags).await?;
 
     tags = database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     tags.sort();
