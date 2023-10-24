@@ -8,7 +8,7 @@ use crate::dialogue::*;
 
 pub async fn receive_sticker_id(
     db: Arc<DatabaseConnection>,
-    bot: Bot,
+    bot: BotType,
     dialogue: MyDialogue,
     msg: Message,
 ) -> HandlerResult {
@@ -29,18 +29,20 @@ pub async fn receive_sticker_id(
         user_id
     );
 
-    let mut current_tags = database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+    let mut current_tags =
+        database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     current_tags.sort();
 
     log::debug!("Current tags: {:?}", current_tags);
 
-    let sticker_usage = database::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+    let sticker_usage =
+        database::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
     if current_tags.len() > 0 {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Your current tags for this sticker are: {}\nYou've used this sticker {} times",
+                "Your current tags for this sticker are: *{}*\nYou've used this sticker `{}` times",
                 current_tags.join(", "),
                 sticker_usage
             ),
@@ -50,7 +52,7 @@ pub async fn receive_sticker_id(
 
     bot.send_message(
       msg.chat.id,
-      "Which tags do you want to add to this sticker?\n- Make the first tag `replace`, to replace all tags\n- Make the first tag `clear`, to remove all existing tags\n- Start the tag with `-` to remove an existing tag",
+      "Which tags do you want to add to this sticker?\n\\- Make the first tag `replace`, to replace all tags\n\\- Make the first tag `clear`, to remove all existing tags\n\\- Start the tag with `-` to remove an existing tag",
     )
     .await?;
 
@@ -63,7 +65,7 @@ pub async fn receive_sticker_id(
 
 pub async fn receive_sticker_tags(
     db: Arc<DatabaseConnection>,
-    bot: Bot,
+    bot: BotType,
     dialogue: MyDialogue,
     msg: Message,
     sticker: FileMeta,
@@ -82,6 +84,7 @@ pub async fn receive_sticker_tags(
         .replace(",", " ")
         .split(" ")
         .map(|s| s.trim().to_string())
+        .filter(|s| s.len() > 0)
         .collect();
 
     log::debug!("Got tags: {:?} from {:?}", tags, user_id);
@@ -94,15 +97,16 @@ pub async fn receive_sticker_tags(
 
     if tags[0] == "replace" || tags[0] == "clear" {
         log::debug!("Wiping tags");
-        tags.remove(0);
         database::wipe_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
-    }
 
-    if tags[0] == "clear" {
-        bot.send_message(msg.chat.id, "Cleared all tags for this sticker")
-            .await?;
-        dialogue.update(ConversationState::ReceiveStickerID).await?;
-        return Ok(());
+        if tags[0] == "clear" {
+            bot.send_message(msg.chat.id, "Cleared all tags for this sticker")
+                .await?;
+            dialogue.update(ConversationState::ReceiveStickerID).await?;
+            return Ok(());
+        }
+
+        tags.remove(0);
     }
 
     if tags.len() == 0 {
@@ -144,7 +148,7 @@ pub async fn receive_sticker_tags(
 
     bot.send_message(
         msg.chat.id,
-        format!("The new tags for this sticker are now: {}", tags.join(", ")),
+        format!("The new tags for this sticker are now: *{}*", tags.join(", ")),
     )
     .await?;
     dialogue.update(ConversationState::ReceiveStickerID).await?;

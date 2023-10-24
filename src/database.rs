@@ -24,9 +24,9 @@ pub async fn insert_tags(
         .iter()
         .map(|tag_name| {
             sticker_tag::Model {
-                sticker_id: unique_sticker_id.clone(),
-                file_id: file_id.clone(),
-                user_id: user_id.clone(),
+                sticker_id: unique_sticker_id.to_owned(),
+                file_id: file_id.to_owned(),
+                user_id: user_id.to_owned(),
                 tag_name: tag_name.to_owned(),
             }
             .into()
@@ -169,8 +169,8 @@ pub async fn increase_sticker_stat(
     );
 
     let model: sticker_stat::ActiveModel = sticker_stat::Model {
-        user_id: user_id.clone(),
-        sticker_id: unique_sticker_id.clone(),
+        user_id: user_id.to_owned(),
+        sticker_id: unique_sticker_id.to_owned(),
         count: 1,
     }
     .into();

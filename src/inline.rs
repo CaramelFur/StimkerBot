@@ -10,11 +10,12 @@ use teloxide::types::InputMessageContent;
 use teloxide::types::InputMessageContentText;
 
 use crate::database;
+use crate::dialogue::BotType;
 use crate::dialogue::HandlerResult;
 
 pub async fn handler_inline_query(
     db: Arc<DatabaseConnection>,
-    bot: Bot,
+    bot: BotType,
     query: InlineQuery,
 ) -> HandlerResult {
     let user_id = query.from.id.to_string();
@@ -79,7 +80,7 @@ pub async fn handler_inline_query(
 
 async fn handler_send_all(
     db: Arc<DatabaseConnection>,
-    bot: Bot,
+    bot: BotType,
     query: InlineQuery,
 ) -> HandlerResult {
     let user_id = query.from.id.to_string();
@@ -129,13 +130,13 @@ pub async fn handle_inline_choice(
     Ok(())
 }
 
-async fn send_inline_results<I, R>(bot: &Bot, inline_query_id: I, results: R) -> HandlerResult
+async fn send_inline_results<I, R>(bot: &BotType, inline_query_id: I, results: R) -> HandlerResult
 where
     I: Into<String>,
     R: IntoIterator<Item = InlineQueryResult>,
 {
     <Bot as Requester>::AnswerInlineQuery::new(
-        bot.clone(),
+        bot.inner().clone(),
         payloads::AnswerInlineQuery::new(inline_query_id, results)
             .cache_time(5)
             .is_personal(true),

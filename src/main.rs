@@ -33,7 +33,8 @@ async fn main() {
     Migrator::up(db.as_ref(), None).await.unwrap();
     log::debug!("Successfully opened database");
 
-    let bot = Bot::from_env();
+    let bot = Bot::from_env()
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2);
 
     let message_receive_sticker_id_tree = dptree::case![ConversationState::ReceiveStickerID]
         .endpoint({
