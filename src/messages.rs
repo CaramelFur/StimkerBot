@@ -42,7 +42,7 @@ pub async fn receive_sticker_id(
         bot.send_message(
             msg.chat.id,
             format!(
-                "Your current tags for this sticker are: *{}*\nYou've used this sticker `{}` times",
+                "Your current tags for this sticker are: <b>{}</b>\nYou've used this sticker <code>{}</code> times",
                 current_tags.join(", "),
                 sticker_usage
             ),
@@ -52,7 +52,7 @@ pub async fn receive_sticker_id(
 
     bot.send_message(
       msg.chat.id,
-      "Which tags do you want to add to this sticker?\n\\- Make the first tag `replace`, to replace all tags\n\\- Make the first tag `clear`, to remove all existing tags\n\\- Start the tag with `-` to remove an existing tag",
+      "Which tags do you want to add to this sticker?\n- Make the first tag <code>replace</code>, to replace all tags\n- Make the first tag <code>clear</code>, to remove all existing tags\n- Start the tag with <code>-</code> to remove an existing tag",
     )
     .await?;
 
@@ -148,7 +148,7 @@ pub async fn receive_sticker_tags(
 
     bot.send_message(
         msg.chat.id,
-        format!("The new tags for this sticker are now: *{}*", tags.join(", ")),
+        format!("The new tags for this sticker are now: <b>{}</b>", tags.join(", ")),
     )
     .await?;
     dialogue.update(ConversationState::ReceiveStickerID).await?;
