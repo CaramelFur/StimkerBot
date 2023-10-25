@@ -5,6 +5,7 @@ use teloxide::types::FileMeta;
 
 use crate::database;
 use crate::dialogue::*;
+use crate::util::unix_to_humantime;
 
 pub async fn receive_sticker_id(
     db: Arc<DatabaseConnection>,
@@ -38,13 +39,14 @@ pub async fn receive_sticker_id(
     let sticker_usage =
         database::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
-    if current_tags.len() > 0 {
+    if let Some(sticker_usage) = sticker_usage {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Your current tags for this sticker are: <b>{}</b>\nYou've used this sticker <code>{}</code> times",
+                "Your current tags for this sticker are: <b>{}</b>\nYou've used this sticker <code>{}</code> times\nYou've last used this sticker <code>{}</code>",
                 current_tags.join(", "),
-                sticker_usage
+                sticker_usage.count,
+                unix_to_humantime(sticker_usage.last_used)
             ),
         )
         .await?;

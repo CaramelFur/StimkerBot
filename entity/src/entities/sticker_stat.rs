@@ -10,7 +10,8 @@ pub struct Model {
     pub user_id: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub sticker_id: String,
-    pub count: i32,
+    pub count: i64,
+    pub last_used: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

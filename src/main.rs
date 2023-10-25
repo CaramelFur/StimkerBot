@@ -9,6 +9,7 @@ mod database;
 mod dialogue;
 mod inline;
 mod messages;
+mod util;
 
 use dialogue::*;
 

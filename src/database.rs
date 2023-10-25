@@ -6,6 +6,8 @@ use sea_orm::DatabaseConnection;
 use sea_orm::QueryOrder;
 use sea_orm::QuerySelect;
 
+use crate::util;
+
 pub async fn insert_tags(
     db: &DatabaseConnection,
     user_id: String,
@@ -172,6 +174,7 @@ pub async fn increase_sticker_stat(
         user_id: user_id.to_owned(),
         sticker_id: unique_sticker_id.to_owned(),
         count: 1,
+        last_used: util::get_unix(),
     }
     .into();
 
@@ -181,6 +184,10 @@ pub async fn increase_sticker_stat(
                 .value(
                     sticker_stat::Column::Count,
                     Expr::col(sticker_stat::Column::Count).add(1),
+                )
+                .value(
+                    sticker_stat::Column::LastUsed,
+                    Expr::col(sticker_stat::Column::LastUsed).add(util::get_unix()),
                 )
                 .to_owned(),
         )
@@ -196,11 +203,16 @@ pub async fn increase_sticker_stat(
     Ok(())
 }
 
+pub struct StickerUsage {
+    pub count: i64,
+    pub last_used: i64,
+}
+
 pub async fn get_sticker_usage(
     db: &DatabaseConnection,
     user_id: String,
     unique_sticker_id: String,
-) -> Result<i32, DbErr> {
+) -> Result<Option<StickerUsage>, DbErr> {
     log::debug!(
         "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?}",
         user_id,
@@ -214,8 +226,10 @@ pub async fn get_sticker_usage(
     let result = query
         .one(db)
         .await?
-        .map(|sticker_stat| sticker_stat.count)
-        .unwrap_or(0);
+        .map(|sticker_stat| StickerUsage {
+            count: sticker_stat.count,
+            last_used: sticker_stat.last_used,
+        });
 
     log::debug!(
         "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?} done",
