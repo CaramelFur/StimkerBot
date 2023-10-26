@@ -1,4 +1,3 @@
-use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use teloxide::payloads;
 use teloxide::prelude::*;
@@ -9,12 +8,13 @@ use teloxide::types::InlineQueryResultCachedSticker;
 use teloxide::types::InputMessageContent;
 use teloxide::types::InputMessageContentText;
 
-use crate::database;
-use crate::dialogue::BotType;
-use crate::dialogue::HandlerResult;
+use crate::database::queries;
+use crate::types::BotType;
+use crate::types::DbConn;
+use crate::types::HandlerResult;
 
 pub async fn handler_inline_query(
-    db: Arc<DatabaseConnection>,
+    db: Arc<DbConn>,
     bot: BotType,
     query: InlineQuery,
 ) -> HandlerResult {
@@ -50,7 +50,7 @@ pub async fn handler_inline_query(
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
-    let stickers = database::find_stickers(&db, user_id, tags).await?;
+    let stickers = queries::find_stickers(&db, user_id, tags).await?;
 
     if stickers.len() == 0 {
         send_inline_results(
@@ -78,16 +78,12 @@ pub async fn handler_inline_query(
     Ok(())
 }
 
-async fn handler_send_all(
-    db: Arc<DatabaseConnection>,
-    bot: BotType,
-    query: InlineQuery,
-) -> HandlerResult {
+async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
     log::debug!("Sending all stickers for {:?}", user_id);
 
-    let stickers = database::list_stickers(&db, user_id).await?;
+    let stickers = queries::list_stickers(&db, user_id).await?;
 
     if stickers.len() == 0 {
         send_inline_results(
@@ -113,19 +109,12 @@ async fn handler_send_all(
     send_inline_results(&bot, query.id, results).await
 }
 
-pub async fn handle_inline_choice(
-    db: Arc<DatabaseConnection>,
-    query: ChosenInlineResult,
-) -> HandlerResult {
+pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
-    log::debug!(
-        "Chosen inline result: {:?} by user {:?}",
-        query,
-        user_id
-    );
+    log::debug!("Chosen inline result: {:?} by user {:?}", query, user_id);
 
-    database::increase_sticker_stat(&db, user_id, query.result_id).await?;
+    queries::increase_sticker_stat(&db, user_id, query.result_id).await?;
 
     Ok(())
 }

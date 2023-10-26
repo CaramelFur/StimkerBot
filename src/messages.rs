@@ -1,16 +1,15 @@
-use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::FileMeta;
 
-use crate::database;
-use crate::dialogue::*;
+use crate::queries;
+use crate::types::*;
 use crate::util::unix_to_humantime;
 
 pub async fn receive_sticker_id(
-    db: Arc<DatabaseConnection>,
+    db: Arc<DbConn>,
     bot: BotType,
-    dialogue: MyDialogue,
+    dialogue: DialogueWithState,
     msg: Message,
 ) -> HandlerResult {
     // Check if message is sticker
@@ -31,13 +30,13 @@ pub async fn receive_sticker_id(
     );
 
     let mut current_tags =
-        database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+        queries::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     current_tags.sort();
 
     log::debug!("Current tags: {:?}", current_tags);
 
     let sticker_usage =
-        database::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+        queries::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
     if let Some(sticker_usage) = sticker_usage {
         bot.send_message(
@@ -66,9 +65,9 @@ pub async fn receive_sticker_id(
 }
 
 pub async fn receive_sticker_tags(
-    db: Arc<DatabaseConnection>,
+    db: Arc<DbConn>,
     bot: BotType,
-    dialogue: MyDialogue,
+    dialogue: DialogueWithState,
     msg: Message,
     sticker: FileMeta,
 ) -> HandlerResult {
@@ -99,7 +98,7 @@ pub async fn receive_sticker_tags(
 
     if tags[0] == "replace" || tags[0] == "clear" {
         log::debug!("Wiping tags");
-        database::wipe_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+        queries::wipe_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
         if tags[0] == "clear" {
             bot.send_message(msg.chat.id, "Cleared all tags for this sticker")
@@ -132,7 +131,7 @@ pub async fn receive_sticker_tags(
     log::debug!("Removing tags: {:?}", remove_tags);
     log::debug!("Adding tags: {:?}", add_tags);
 
-    database::insert_tags(
+    queries::insert_tags(
         &db,
         user_id.clone(),
         sticker.unique_id.clone(),
@@ -141,9 +140,9 @@ pub async fn receive_sticker_tags(
     )
     .await?;
 
-    database::remove_tags(&db, user_id.clone(), sticker.unique_id.clone(), remove_tags).await?;
+    queries::remove_tags(&db, user_id.clone(), sticker.unique_id.clone(), remove_tags).await?;
 
-    tags = database::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+    tags = queries::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
     tags.sort();
 
     log::debug!("New tags for user {:?} is {:?}", user_id, tags);

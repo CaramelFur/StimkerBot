@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM sticker_tag WHERE sticker_id = $1 AND user_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "9d66c28b9391d1b7f64c8cb6fafc054de6bc47dc10987620030a234767f2ac50"
+}

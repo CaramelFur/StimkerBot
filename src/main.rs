@@ -1,20 +1,19 @@
 use dotenv::dotenv;
-use migration::{Migrator, MigratorTrait};
-use sea_orm::Database;
+use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
 
 mod database;
-mod dialogue;
 mod inline;
 mod messages;
+mod types;
 mod util;
 
-use dialogue::*;
+use types::*;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     pretty_env_logger::init();
 
@@ -25,17 +24,17 @@ async fn main() {
     log::debug!("Database location: {:?}", database_location);
 
     log::debug!("Opening/creating and migrating database");
-    std::fs::OpenOptions::new().read(true).create(true).write(true).open(&database_location).unwrap();
-    let db = Arc::new(
-        Database::connect(format!("sqlite://{}", database_location))
+    touch(database_location);
+    let db: DbType = Arc::new(
+        SqlitePoolOptions::new()
+            .connect(&format!("sqlite://{}", database_location))
             .await
             .unwrap(),
     );
-    Migrator::up(db.as_ref(), None).await.unwrap();
+    sqlx::migrate!().run(db.as_ref()).await?;
     log::debug!("Successfully opened database");
 
-    let bot = Bot::from_env()
-        .parse_mode(teloxide::types::ParseMode::Html);
+    let bot = Bot::from_env().parse_mode(teloxide::types::ParseMode::Html);
 
     let message_receive_sticker_id_tree = dptree::case![ConversationState::ReceiveStickerID]
         .endpoint({
@@ -79,4 +78,15 @@ async fn main() {
         .build()
         .dispatch()
         .await;
+
+    Ok(())
+}
+
+fn touch(path: String) {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .create(true)
+        .write(true)
+        .open(path)
+        .unwrap();
 }
