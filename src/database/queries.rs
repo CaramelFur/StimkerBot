@@ -1,6 +1,6 @@
 use sqlx::{Error, QueryBuilder};
 
-use crate::database::entities::{EntityStat, EntityTag};
+use crate::database::entities::{EntityStat, Entity, EntityType};
 use crate::types::DbConn;
 use crate::util;
 
@@ -9,6 +9,7 @@ pub async fn insert_tags(
     user_id: String,
     entity_id: String,
     file_id: String,
+    entity_type: EntityType,
     tag_names: Vec<String>,
 ) -> Result<(), Error> {
     if tag_names.len() == 0 {
@@ -22,26 +23,15 @@ pub async fn insert_tags(
         user_id
     );
 
-    let new_tag_associations: Vec<EntityTag> = tag_names
-        .iter()
-        .map(|tag_name| EntityTag {
-            entity_id: entity_id.to_owned(),
-            file_id: file_id.to_owned(),
-            user_id: user_id.to_owned(),
-            tag_name: tag_name.to_owned(),
-        })
-        .collect();
-
-    log::debug!("new_tag_associations: {:?}", new_tag_associations);
-
     let mut query_builder = QueryBuilder::new(
-        "INSERT OR IGNORE INTO entity_tag (entity_id, file_id, user_id, tag_name) ",
+        "INSERT OR IGNORE INTO entity_tag (entity_id, file_id, user_id, entity_type, tag_name) ",
     );
-    query_builder.push_values(new_tag_associations, |mut b, new_category| {
-        b.push_bind(new_category.entity_id)
-            .push_bind(new_category.file_id)
-            .push_bind(new_category.user_id)
-            .push_bind(new_category.tag_name);
+    query_builder.push_values(tag_names, |mut b, tag_name| {
+        b.push_bind(entity_id.clone())
+            .push_bind(file_id.clone())
+            .push_bind(user_id.clone())
+            .push_bind(entity_type.clone())
+            .push_bind(tag_name);
     });
 
     query_builder.build().execute(db).await?;
@@ -139,7 +129,7 @@ pub async fn find_entities(
     db: &DbConn,
     user_id: String,
     tags: Vec<String>,
-) -> Result<Vec<EntityTag>, Error> {
+) -> Result<Vec<Entity>, Error> {
     log::debug!("find_entities: {:?} for user_id: {:?}", tags, user_id);
 
     let mut query_builder = QueryBuilder::new(
@@ -159,17 +149,17 @@ pub async fn find_entities(
     query_builder.push(" ORDER BY entity_stat.count DESC");
     query_builder.push(" LIMIT 50");
 
-    let result: Vec<EntityTag> = query_builder.build_query_as().fetch_all(db).await?;
+    let result: Vec<Entity> = query_builder.build_query_as().fetch_all(db).await?;
 
     log::debug!("find_entities result: {:?}", result);
 
     Ok(result)
 }
 
-pub async fn list_entities(db: &DbConn, user_id: String) -> Result<Vec<EntityTag>, Error> {
+pub async fn list_entities(db: &DbConn, user_id: String) -> Result<Vec<Entity>, Error> {
     log::debug!("list_entities for user_id: {:?}", user_id);
 
-    let result: Vec<EntityTag> = sqlx::query_as(
+    let result: Vec<Entity> = sqlx::query_as(
         "SELECT entity_tag.* FROM entity_tag \
         LEFT JOIN entity_stat ON entity_tag.entity_id = entity_stat.entity_id \
         WHERE entity_tag.user_id = $1 \

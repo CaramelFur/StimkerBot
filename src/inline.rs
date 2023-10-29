@@ -2,11 +2,7 @@ use std::sync::Arc;
 use teloxide::payloads;
 use teloxide::prelude::*;
 
-use teloxide::types::InlineQueryResult;
-use teloxide::types::InlineQueryResultArticle;
-use teloxide::types::InlineQueryResultCachedSticker;
-use teloxide::types::InputMessageContent;
-use teloxide::types::InputMessageContentText;
+use teloxide::types::*;
 
 use crate::database::queries;
 use crate::types::BotType;
@@ -64,14 +60,7 @@ pub async fn handler_inline_query(
 
     log::debug!("Found stickers: {:?}", entities);
 
-    let results = entities.iter().map(|sticker| {
-        InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.entity_id.to_owned()),
-            sticker_file_id: sticker.file_id.to_owned(),
-            input_message_content: None,
-            reply_markup: None,
-        })
-    });
+    let results = entities.iter().map(|sticker| sticker.to_inline());
 
     send_inline_results(&bot, query.id, results).await?;
 

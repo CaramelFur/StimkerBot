@@ -30,10 +30,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
     let message_receive_sticker_tags_tree =
-        dptree::case![ConversationState::ReceiveEntityTags { entity }].endpoint({
+        dptree::case![ConversationState::ReceiveEntityTags { entity, entity_type }].endpoint({
             let db = db.clone();
-            move |bot, dialogue, sticker, msg| {
-                messages::receive_entity_tags(db.clone(), bot, dialogue, msg, sticker)
+            move |bot, dialogue, (entity, entity_type), msg| {
+                messages::receive_entity_tags(db.clone(), bot, dialogue, msg, entity, entity_type)
             }
         });
 

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use teloxide::prelude::*;
-use teloxide::types::{FileMeta};
+use teloxide::types::{FileMeta, InputFile, PhotoSize};
 
+use crate::database::entities::EntityType;
 use crate::database::queries;
 use crate::types::*;
 use crate::util::unix_to_humantime;
@@ -12,39 +13,45 @@ pub async fn receive_entity_id(
     dialogue: DialogueWithState,
     msg: Message,
 ) -> HandlerResult {
-    // Check if message is sticker or animation
-    if msg.sticker().is_none() && msg.animation().is_none() {
-        bot.send_message(msg.chat.id, "Please send me a sticker or animation")
+    let (entity, entity_type) = if msg.sticker().is_some() {
+        (msg.sticker().unwrap().file.to_owned(), EntityType::Sticker)
+    } else if msg.animation().is_some() {
+        (msg.animation().unwrap().file.to_owned(), EntityType::Animation)
+    } else if msg.video().is_some() {
+        (msg.video().unwrap().file.to_owned(), EntityType::Video)
+    } else if msg.photo().is_some() {
+        (msg.photo().unwrap().first().unwrap().file.to_owned(), EntityType::Photo)
+    } else {
+        bot.send_message(msg.chat.id, "Please send me a sticker, animation, photo or video")
             .await?;
         return Ok(());
-    }
+    };
 
-    let sticker = msg.sticker().unwrap().file.clone();
     let user_id = msg.from().unwrap().id.to_string();
 
     log::debug!(
         "Got entity: {:?} file: {:?} from: {:?}",
-        sticker.unique_id,
-        sticker.id,
+        entity.unique_id,
+        entity.id,
         user_id
     );
 
     let mut current_tags =
-        queries::get_tags(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+        queries::get_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
     current_tags.sort();
 
     log::debug!("Current tags: {:?}", current_tags);
 
     let entity_usage =
-        queries::get_entity_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
+        queries::get_entity_usage(&db, user_id.clone(), entity.unique_id.clone()).await?;
 
     if current_tags.len() > 0 {
         bot.send_message(
             msg.chat.id,
             format!(
-                "Your current tags for this sticker are: <b>{}</b>\n\
-                You've used this sticker <code>{}</code> times\n\
-                You've last used this sticker <code>{}</code>",
+                "Your current tags for this are: <b>{}</b>\n\
+                You've used this <code>{}</code> times\n\
+                You've last used this <code>{}</code>",
                 current_tags.join(", "),
                 entity_usage.count,
                 unix_to_humantime(entity_usage.last_used)
@@ -55,7 +62,7 @@ pub async fn receive_entity_id(
 
     bot.send_message(
         msg.chat.id,
-        "Which tags do you want to add to this sticker?\n\
+        "Which tags do you want to add to this?\n\
         - Make the first tag <code>replace</code>, to replace all tags\n\
         - Make the first tag <code>clear</code>, to remove all existing tags\n\
         - Start the tag with <code>-</code> to remove an existing tag",
@@ -63,7 +70,7 @@ pub async fn receive_entity_id(
     .await?;
 
     dialogue
-        .update(ConversationState::ReceiveEntityTags { entity: sticker })
+        .update(ConversationState::ReceiveEntityTags { entity, entity_type })
         .await?;
 
     Ok(())
@@ -75,6 +82,7 @@ pub async fn receive_entity_tags(
     dialogue: DialogueWithState,
     msg: Message,
     entity: FileMeta,
+    entity_type: EntityType,
 ) -> HandlerResult {
     if msg.text().is_none() {
         bot.send_message(
@@ -109,7 +117,7 @@ pub async fn receive_entity_tags(
         queries::wipe_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
 
         if tags[0] == "clear" {
-            bot.send_message(msg.chat.id, "Cleared all tags for this sticker")
+            bot.send_message(msg.chat.id, "Cleared all tags for this")
                 .await?;
             dialogue.update(ConversationState::ReceiveEntityID).await?;
             return Ok(());
@@ -144,6 +152,7 @@ pub async fn receive_entity_tags(
         user_id.clone(),
         entity.unique_id.clone(),
         entity.id.clone(),
+        entity_type.clone(),
         add_tags,
     )
     .await?;
@@ -158,7 +167,7 @@ pub async fn receive_entity_tags(
     bot.send_message(
         msg.chat.id,
         format!(
-            "The new tags for this sticker are now: <b>{}</b>",
+            "The new tags for this are now: <b>{}</b>",
             tags.join(", ")
         ),
     )

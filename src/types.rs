@@ -5,6 +5,8 @@ use teloxide::{
     types::FileMeta, Bot,
 };
 
+use crate::database::entities::EntityType;
+
 pub type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 pub type DialogueWithState = Dialogue<ConversationState, InMemStorage<ConversationState>>;
 
@@ -18,5 +20,6 @@ pub enum ConversationState {
     ReceiveEntityID,
     ReceiveEntityTags {
         entity: FileMeta,
+        entity_type: EntityType,
     },
 }
