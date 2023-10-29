@@ -1,5 +1,5 @@
 -- Add migration script here
-CREATE TABLE "sticker_tag" IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS "sticker_tag" (
   "sticker_id" text NOT NULL,
   "file_id" text NOT NULL,
   "user_id" text NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE "sticker_tag" IF NOT EXISTS (
   PRIMARY KEY ("sticker_id", "user_id", "tag_name")
 );
 
-CREATE TABLE "sticker_stat" IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS "sticker_stat" (
   "user_id" text NOT NULL,
   "sticker_id" text NOT NULL,
   "count" integer NOT NULL,

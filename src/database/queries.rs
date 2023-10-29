@@ -1,6 +1,6 @@
 use sqlx::{Error, QueryBuilder};
 
-use crate::database::entities::StickerTag;
+use crate::database::entities::{StickerStat, StickerTag};
 use crate::types::DbConn;
 use crate::util;
 
@@ -51,11 +51,14 @@ pub async fn wipe_tags(db: &DbConn, user_id: String, sticker_id: String) -> Resu
         user_id
     );
 
-    sqlx::query("DELETE FROM sticker_tag WHERE sticker_id = $1 AND user_id = $2")
-        .bind(sticker_id)
-        .bind(user_id)
-        .execute(db)
-        .await?;
+    sqlx::query(
+        "DELETE FROM sticker_tag \
+        WHERE sticker_id = $1 AND user_id = $2",
+    )
+    .bind(sticker_id)
+    .bind(user_id)
+    .execute(db)
+    .await?;
 
     Ok(())
 }
@@ -73,7 +76,10 @@ pub async fn remove_tags(
         user_id
     );
 
-    let mut query_builder = QueryBuilder::new("DELETE FROM sticker_tag WHERE sticker_id = ");
+    let mut query_builder = QueryBuilder::new(
+        "DELETE FROM sticker_tag \
+        WHERE sticker_id = ",
+    );
     query_builder.push_bind(sticker_id);
     query_builder.push(" AND user_id = ");
     query_builder.push_bind(user_id);
@@ -99,12 +105,14 @@ pub async fn get_tags(
         user_id
     );
 
-    let temp_result: Vec<(String,)> =
-        sqlx::query_as("SELECT tag_name FROM sticker_tag WHERE sticker_id = $1 AND user_id = $2")
-            .bind(sticker_id)
-            .bind(user_id)
-            .fetch_all(db)
-            .await?;
+    let temp_result: Vec<(String,)> = sqlx::query_as(
+        "SELECT tag_name FROM sticker_tag \
+            WHERE sticker_id = $1 AND user_id = $2",
+    )
+    .bind(sticker_id)
+    .bind(user_id)
+    .fetch_all(db)
+    .await?;
 
     let result: Vec<String> = temp_result
         .into_iter()
@@ -123,7 +131,10 @@ pub async fn find_stickers(
 ) -> Result<Vec<StickerTag>, Error> {
     log::debug!("find_stickers: {:?} for user_id: {:?}", tags, user_id);
 
-    let mut query_builder = QueryBuilder::new("SELECT * FROM sticker_tag LEFT JOIN sticker_stat ON sticker_tag.sticker_id = sticker_stat.sticker_id");
+    let mut query_builder = QueryBuilder::new(
+        "SELECT sticker_tag.* FROM sticker_tag \
+        LEFT JOIN sticker_stat ON sticker_tag.sticker_id = sticker_stat.sticker_id",
+    );
     query_builder.push(" WHERE sticker_tag.user_id = ");
     query_builder.push_bind(user_id);
     query_builder.push(" AND sticker_tag.tag_name IN (");
@@ -148,10 +159,16 @@ pub async fn list_stickers(db: &DbConn, user_id: String) -> Result<Vec<StickerTa
     log::debug!("list_stickers for user_id: {:?}", user_id);
 
     let result: Vec<StickerTag> = sqlx::query_as(
-        "SELECT * FROM sticker_tag LEFT JOIN sticker_stat ON sticker_tag.sticker_id = sticker_stat.sticker_id WHERE sticker_tag.user_id = $1 GROUP BY sticker_tag.sticker_id ORDER BY sticker_stat.count DESC LIMIT 50")
-        .bind(user_id)
-        .fetch_all(db)
-        .await?;
+        "SELECT sticker_tag.* FROM sticker_tag \
+        LEFT JOIN sticker_stat ON sticker_tag.sticker_id = sticker_stat.sticker_id \
+        WHERE sticker_tag.user_id = $1 \
+        GROUP BY sticker_tag.sticker_id \
+        ORDER BY sticker_stat.count DESC \
+        LIMIT 50",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await?;
 
     log::debug!("list_stickers result: {:?}", result);
 
@@ -162,36 +179,23 @@ pub async fn increase_sticker_stat(
     db: &DbConn,
     user_id: String,
     unique_sticker_id: String,
-) -> Result<(), DbErr> {
+) -> Result<(), Error> {
     log::debug!(
         "increase_sticker_stat for user_id: {:?} and unique_sticker_id: {:?}",
         user_id,
         unique_sticker_id
     );
 
-    let model: sticker_stat::ActiveModel = sticker_stat::Model {
-        user_id: user_id.to_owned(),
-        sticker_id: unique_sticker_id.to_owned(),
-        count: 1,
-        last_used: util::get_unix(),
-    }
-    .into();
-
-    sticker_stat::Entity::insert(model)
-        .on_conflict(
-            OnConflict::new()
-                .value(
-                    sticker_stat::Column::Count,
-                    Expr::col(sticker_stat::Column::Count).add(1),
-                )
-                .value(
-                    sticker_stat::Column::LastUsed,
-                    Expr::col(sticker_stat::Column::LastUsed).add(util::get_unix()),
-                )
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
+    sqlx::query(
+        "INSERT INTO sticker_stat (user_id, sticker_id, count, last_used) \
+        VALUES ($1, $2, 1, $3) \
+        ON CONFLICT (user_id, sticker_id) DO UPDATE SET count = sticker_stat.count + 1, last_used = $3"
+    )
+    .bind(user_id.clone())
+    .bind(unique_sticker_id.clone())
+    .bind(util::get_unix())
+    .execute(db)
+    .await?;
 
     log::debug!(
         "increase_sticker_stat for user_id: {:?} and unique_sticker_id: {:?} done",
@@ -202,30 +206,25 @@ pub async fn increase_sticker_stat(
     Ok(())
 }
 
-pub struct StickerUsage {
-    pub count: i64,
-    pub last_used: i64,
-}
-
 pub async fn get_sticker_usage(
     db: &DbConn,
     user_id: String,
     unique_sticker_id: String,
-) -> Result<Option<StickerUsage>, DbErr> {
+) -> Result<Option<StickerStat>, Error> {
     log::debug!(
         "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?}",
         user_id,
         unique_sticker_id
     );
 
-    let query = sticker_stat::Entity::find()
-        .filter(sticker_stat::Column::UserId.eq(&user_id))
-        .filter(sticker_stat::Column::StickerId.eq(&unique_sticker_id));
-
-    let result = query.one(db).await?.map(|sticker_stat| StickerUsage {
-        count: sticker_stat.count,
-        last_used: sticker_stat.last_used,
-    });
+    let result: Option<StickerStat> = sqlx::query_as(
+        "SELECT * FROM sticker_stat \
+        WHERE user_id = $1 AND sticker_id = $2",
+    )
+    .bind(user_id.clone())
+    .bind(unique_sticker_id.clone())
+    .fetch_optional(db)
+    .await?;
 
     log::debug!(
         "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?} done",

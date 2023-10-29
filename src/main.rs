@@ -24,7 +24,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("Database location: {:?}", database_location);
 
     log::debug!("Opening/creating and migrating database");
-    touch(database_location);
+    
+    touch(database_location.clone());
     let db: DbType = Arc::new(
         SqlitePoolOptions::new()
             .connect(&format!("sqlite://{}", database_location))

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::FileMeta;
 
-use crate::queries;
+use crate::database::queries;
 use crate::types::*;
 use crate::util::unix_to_humantime;
 
