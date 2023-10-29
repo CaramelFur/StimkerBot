@@ -14,12 +14,19 @@ pub type BotType = DefaultParseMode<Bot>;
 pub type DbConn = Pool<Sqlite>;
 pub type DbType = Arc<DbConn>;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub enum ConversationState {
     #[default]
-    ReceiveEntityID,
+    ReceiveEntityId,
     ReceiveEntityTags {
         entity: FileMeta,
         entity_type: EntityType,
     },
+
+    VerifyStop,
+
+    RecieveEntitiesId,
+    RecieveEntitiesTags {
+        entities: Vec<FileMeta>,
+    }
 }
