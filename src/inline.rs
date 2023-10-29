@@ -50,9 +50,9 @@ pub async fn handler_inline_query(
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
-    let stickers = queries::find_stickers(&db, user_id, tags).await?;
+    let entities = queries::find_entities(&db, user_id, tags).await?;
 
-    if stickers.len() == 0 {
+    if entities.len() == 0 {
         send_inline_results(
             &bot,
             query.id,
@@ -62,11 +62,11 @@ pub async fn handler_inline_query(
         return Ok(());
     }
 
-    log::debug!("Found stickers: {:?}", stickers);
+    log::debug!("Found stickers: {:?}", entities);
 
-    let results = stickers.iter().map(|sticker| {
+    let results = entities.iter().map(|sticker| {
         InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.sticker_id.to_owned()),
+            id: format!("{}", sticker.entity_id.to_owned()),
             sticker_file_id: sticker.file_id.to_owned(),
             input_message_content: None,
             reply_markup: None,
@@ -83,9 +83,9 @@ async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> 
 
     log::debug!("Sending all stickers for {:?}", user_id);
 
-    let stickers = queries::list_stickers(&db, user_id).await?;
+    let entities = queries::list_entities(&db, user_id).await?;
 
-    if stickers.len() == 0 {
+    if entities.len() == 0 {
         send_inline_results(
             &bot,
             query.id,
@@ -95,11 +95,11 @@ async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> 
         return Ok(());
     }
 
-    log::debug!("Found all stickers: {:?}", stickers);
+    log::debug!("Found all stickers: {:?}", entities);
 
-    let results = stickers.iter().map(|sticker| {
+    let results = entities.iter().map(|sticker| {
         InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.sticker_id.to_owned()),
+            id: format!("{}", sticker.entity_id.to_owned()),
             sticker_file_id: sticker.file_id.to_owned(),
             input_message_content: None,
             reply_markup: None,
@@ -114,7 +114,7 @@ pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) ->
 
     log::debug!("Chosen inline result: {:?} by user {:?}", query, user_id);
 
-    queries::increase_sticker_stat(&db, user_id, query.result_id).await?;
+    queries::increase_entity_stat(&db, user_id, query.result_id).await?;
 
     Ok(())
 }

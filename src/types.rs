@@ -15,8 +15,8 @@ pub type DbType = Arc<DbConn>;
 #[derive(Clone, Default)]
 pub enum ConversationState {
     #[default]
-    ReceiveStickerID,
-    ReceiveStickerTags {
-        sticker: FileMeta,
+    ReceiveEntityID,
+    ReceiveEntityTags {
+        entity: FileMeta,
     },
 }

@@ -19,35 +19,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("Starting stimkerbot");
 
-    let database_location =
-        std::env::var("DATABASE_LOCATION").expect("DATABASE_LOCATION must be set");
-    log::debug!("Database location: {:?}", database_location);
-
-    log::debug!("Opening/creating and migrating database");
-    
-    touch(database_location.clone());
-    let db: DbType = Arc::new(
-        SqlitePoolOptions::new()
-            .connect(&format!("sqlite://{}", database_location))
-            .await
-            .unwrap(),
-    );
-    sqlx::migrate!().run(db.as_ref()).await?;
-    log::debug!("Successfully opened database");
+    let db = get_db().await?;
 
     let bot = Bot::from_env().parse_mode(teloxide::types::ParseMode::Html);
 
-    let message_receive_sticker_id_tree = dptree::case![ConversationState::ReceiveStickerID]
+    let message_receive_sticker_id_tree = dptree::case![ConversationState::ReceiveEntityID]
         .endpoint({
             let db = db.clone(); // whyyyyy
-            move |bot, dialogue, msg| messages::receive_sticker_id(db.clone(), bot, dialogue, msg)
+            move |bot, dialogue, msg| messages::receive_entity_id(db.clone(), bot, dialogue, msg)
         });
 
     let message_receive_sticker_tags_tree =
-        dptree::case![ConversationState::ReceiveStickerTags { sticker }].endpoint({
+        dptree::case![ConversationState::ReceiveEntityTags { entity }].endpoint({
             let db = db.clone();
             move |bot, dialogue, sticker, msg| {
-                messages::receive_sticker_tags(db.clone(), bot, dialogue, msg, sticker)
+                messages::receive_entity_tags(db.clone(), bot, dialogue, msg, sticker)
             }
         });
 
@@ -80,7 +66,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .dispatch()
         .await;
 
+    log::debug!("Dispatcher stopped");
+
     Ok(())
+}
+
+async fn get_db() -> Result<DbType, Box<dyn std::error::Error>> {
+    let database_location =
+        std::env::var("DATABASE_LOCATION").expect("DATABASE_LOCATION must be set");
+    log::debug!("Database location: {:?}", database_location);
+
+    log::debug!("Opening/creating and migrating database");
+
+    touch(database_location.clone());
+    let db: DbType = Arc::new(
+        SqlitePoolOptions::new()
+            .connect(&format!("sqlite://{}", database_location))
+            .await
+            .unwrap(),
+    );
+    sqlx::migrate!().run(db.as_ref()).await?;
+    log::debug!("Successfully opened database");
+
+    return Ok(db);
 }
 
 fn touch(path: String) {
