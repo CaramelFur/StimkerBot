@@ -86,14 +86,7 @@ async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> 
 
     log::debug!("Found all stickers: {:?}", entities);
 
-    let results = entities.iter().map(|sticker| {
-        InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.entity_id.to_owned()),
-            sticker_file_id: sticker.file_id.to_owned(),
-            input_message_content: None,
-            reply_markup: None,
-        })
-    });
+    let results = entities.iter().map(|sticker| sticker.to_inline());
 
     send_inline_results(&bot, query.id, results).await
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use teloxide::prelude::*;
-use teloxide::types::{FileMeta, InputFile, PhotoSize};
+use teloxide::types::FileMeta;
 
 use crate::database::entities::EntityType;
 use crate::database::queries;

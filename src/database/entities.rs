@@ -1,5 +1,3 @@
-use std::default;
-
 use teloxide::types::*;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type)]

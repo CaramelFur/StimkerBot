@@ -1,6 +1,6 @@
-use sqlx::{Error, QueryBuilder};
+use sqlx::{Error, QueryBuilder, Sqlite};
 
-use crate::database::entities::{EntityStat, Entity, EntityType};
+use crate::database::entities::{Entity, EntityStat, EntityType};
 use crate::types::DbConn;
 use crate::util;
 
@@ -23,18 +23,56 @@ pub async fn insert_tags(
         user_id
     );
 
-    let mut query_builder = QueryBuilder::new(
-        "INSERT OR IGNORE INTO entity_tag (entity_id, file_id, user_id, entity_type, tag_name) ",
-    );
-    query_builder.push_values(tag_names, |mut b, tag_name| {
-        b.push_bind(entity_id.clone())
-            .push_bind(file_id.clone())
-            .push_bind(user_id.clone())
-            .push_bind(entity_type.clone())
-            .push_bind(tag_name);
-    });
+    let mut transaction = db.begin().await?;
 
-    query_builder.build().execute(db).await?;
+    log::debug!("insert_tags: transaction started");
+
+    // Insert the tag into the tag table if it doesn't exist
+    let mut insert_tag_query = QueryBuilder::new("INSERT OR IGNORE INTO entity_tag (tag_name) ");
+    insert_tag_query.push_values(tag_names.clone(), |mut b, tag_name| {
+        b.push_bind(tag_name);
+    });
+    insert_tag_query
+        .build()
+        .execute(transaction.as_mut())
+        .await?;
+
+    log::debug!("insert_tags: tag inserted");
+
+    // Insert the entity into the entity table if it doesn't exist
+    sqlx::query(
+        "INSERT OR REPLACE INTO entity_file (entity_id, file_id, entity_type) \
+        VALUES (?, ?, ?)",
+    )
+    .bind(entity_id.clone())
+    .bind(file_id.clone())
+    .bind(entity_type.clone())
+    .execute(transaction.as_mut())
+    .await?;
+
+    log::debug!("insert_tags: file inserted");
+
+    // Insert a relation between the entity and the tag
+    let mut insert_main_query: QueryBuilder<'_, Sqlite> =
+        QueryBuilder::new("INSERT INTO entity_main (entity_id, user_id, tag_id) ");
+    insert_main_query.push_values(tag_names.clone(), |mut b, tag_name| {
+        b.push_bind(entity_id.clone());
+        b.push_bind(user_id.clone());
+        b.push("(SELECT tag_id from entity_tag where tag_name = ")
+            .push_bind_unseparated(tag_name)
+            .push_unseparated(")");
+    });
+    insert_main_query
+        .build()
+        .execute(transaction.as_mut())
+        .await?;
+
+
+    log::debug!("insert_tags: main inserted");
+
+    transaction.commit().await?;
+
+    log::debug!("insert_tags: transaction committed");
 
     Ok(())
 }
@@ -47,7 +85,7 @@ pub async fn wipe_tags(db: &DbConn, user_id: String, entity_id: String) -> Resul
     );
 
     sqlx::query(
-        "DELETE FROM entity_tag \
+        "DELETE FROM entity_main \
         WHERE entity_id = $1 AND user_id = $2",
     )
     .bind(entity_id)
@@ -76,18 +114,20 @@ pub async fn remove_tags(
     );
 
     let mut query_builder = QueryBuilder::new(
-        "DELETE FROM entity_tag \
+        "DELETE FROM entity_main \
         WHERE entity_id = ",
     );
     query_builder.push_bind(entity_id);
     query_builder.push(" AND user_id = ");
     query_builder.push_bind(user_id);
-    query_builder.push(" AND tag_name IN (");
+    query_builder.push(" AND tag_id IN (");
+    query_builder.push("SELECT tag_id FROM entity_tag WHERE tag_name IN (");
     let mut seperator = query_builder.separated(", ");
     tag_names.iter().for_each(|tag_name| {
         seperator.push_bind(tag_name);
     });
 
+    query_builder.push(")");
     query_builder.push(")");
 
     query_builder.build().execute(db).await?;
@@ -107,8 +147,9 @@ pub async fn get_tags(
     );
 
     let temp_result: Vec<(String,)> = sqlx::query_as(
-        "SELECT tag_name FROM entity_tag \
-            WHERE entity_id = $1 AND user_id = $2",
+        "SELECT tag_name FROM entity_main \
+        JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
+        WHERE entity_id = $1 AND user_id = $2",
     )
     .bind(entity_id)
     .bind(user_id)
@@ -133,17 +174,19 @@ pub async fn find_entities(
     log::debug!("find_entities: {:?} for user_id: {:?}", tags, user_id);
 
     let mut query_builder = QueryBuilder::new(
-        "SELECT entity_tag.* FROM entity_tag \
-        LEFT JOIN entity_stat ON entity_tag.entity_id = entity_stat.entity_id",
+        "SELECT entity_main.entity_id, entity_main.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
+        LEFT JOIN entity_stat ON entity_main.entity_id = entity_stat.entity_id \
+        JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
+        JOIN entity_file ON entity_file.entity_id = entity_main.entity_id",
     );
-    query_builder.push(" WHERE entity_tag.user_id = ");
+    query_builder.push(" WHERE entity_main.user_id = ");
     query_builder.push_bind(user_id);
     query_builder.push(" AND entity_tag.tag_name IN (");
     query_builder.push_values(tags.iter(), |mut b, tag_name| {
         b.push_bind(tag_name);
     });
     query_builder.push(")");
-    query_builder.push(" GROUP BY entity_tag.entity_id");
+    query_builder.push(" GROUP BY entity_main.entity_id");
     query_builder.push(" HAVING COUNT(entity_tag.tag_name) >= ");
     query_builder.push_bind(tags.len() as i32);
     query_builder.push(" ORDER BY entity_stat.count DESC");
@@ -160,10 +203,11 @@ pub async fn list_entities(db: &DbConn, user_id: String) -> Result<Vec<Entity>, 
     log::debug!("list_entities for user_id: {:?}", user_id);
 
     let result: Vec<Entity> = sqlx::query_as(
-        "SELECT entity_tag.* FROM entity_tag \
-        LEFT JOIN entity_stat ON entity_tag.entity_id = entity_stat.entity_id \
-        WHERE entity_tag.user_id = $1 \
-        GROUP BY entity_tag.entity_id \
+        "SELECT entity_main.entity_id, entity_main.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
+        LEFT JOIN entity_stat ON entity_main.entity_id = entity_stat.entity_id \
+        JOIN entity_file ON entity_file.entity_id = entity_main.entity_id \
+        WHERE entity_main.user_id = $1 \
+        GROUP BY entity_main.entity_id \
         ORDER BY entity_stat.count DESC \
         LIMIT 50",
     )
