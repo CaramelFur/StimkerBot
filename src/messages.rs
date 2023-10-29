@@ -38,7 +38,7 @@ pub async fn receive_sticker_id(
     let sticker_usage =
         queries::get_sticker_usage(&db, user_id.clone(), sticker.unique_id.clone()).await?;
 
-    if let Some(sticker_usage) = sticker_usage {
+    if current_tags.len() > 0{
         bot.send_message(
             msg.chat.id,
             format!(
@@ -72,7 +72,7 @@ pub async fn receive_sticker_tags(
     sticker: FileMeta,
 ) -> HandlerResult {
     if msg.text().is_none() {
-        bot.send_message(msg.chat.id, "Please send me a space seperated list of tags")
+        bot.send_message(msg.chat.id, "Please send me a space seperated list of tags or send <code>cancel</code> to cancel")
             .await?;
         return Ok(());
     }

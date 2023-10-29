@@ -11,6 +11,10 @@ pub async fn insert_tags(
     file_id: String,
     tag_names: Vec<String>,
 ) -> Result<(), Error> {
+    if tag_names.len() == 0 {
+        return Ok(());
+    }
+
     log::debug!(
         "insert_tags: {:?} for sticker_id: {:?} and user_id: {:?}",
         tag_names,
@@ -30,8 +34,9 @@ pub async fn insert_tags(
 
     log::debug!("new_tag_associations: {:?}", new_tag_associations);
 
-    let mut query_builder =
-        QueryBuilder::new("INSERT INTO sticker_tag (sticker_id, file_id, user_id, tag_name)");
+    let mut query_builder = QueryBuilder::new(
+        "INSERT OR IGNORE INTO sticker_tag (sticker_id, file_id, user_id, tag_name) ",
+    );
     query_builder.push_values(new_tag_associations, |mut b, new_category| {
         b.push_bind(new_category.sticker_id)
             .push_bind(new_category.file_id)
@@ -69,6 +74,10 @@ pub async fn remove_tags(
     sticker_id: String,
     tag_names: Vec<String>,
 ) -> Result<(), Error> {
+    if tag_names.len() == 0 {
+        return Ok(());
+    }
+
     log::debug!(
         "remove_tags: {:?} for sticker_id: {:?} and user_id: {:?}",
         tag_names,
@@ -84,9 +93,11 @@ pub async fn remove_tags(
     query_builder.push(" AND user_id = ");
     query_builder.push_bind(user_id);
     query_builder.push(" AND tag_name IN (");
-    query_builder.push_values(tag_names.iter(), |mut b, tag_name| {
-        b.push_bind(tag_name);
+    let mut seperator = query_builder.separated(", ");
+    tag_names.iter().for_each(|tag_name| {
+        seperator.push_bind(tag_name);
     });
+
     query_builder.push(")");
 
     query_builder.build().execute(db).await?;
@@ -210,7 +221,7 @@ pub async fn get_sticker_usage(
     db: &DbConn,
     user_id: String,
     unique_sticker_id: String,
-) -> Result<Option<StickerStat>, Error> {
+) -> Result<StickerStat, Error> {
     log::debug!(
         "get_sticker_usage for user_id: {:?} and unique_sticker_id: {:?}",
         user_id,
@@ -232,5 +243,10 @@ pub async fn get_sticker_usage(
         unique_sticker_id
     );
 
-    Ok(result)
+    Ok(result.unwrap_or(StickerStat {
+        user_id: user_id.clone(),
+        sticker_id: unique_sticker_id.clone(),
+        count: 0,
+        last_used: 0,
+    }))
 }
