@@ -7,6 +7,7 @@ use teloxide::types::*;
 use crate::database::queries;
 use crate::types::BotType;
 use crate::types::DbConn;
+use crate::types::EntitySort;
 use crate::types::HandlerResult;
 
 pub async fn handler_inline_query(
@@ -46,7 +47,8 @@ pub async fn handler_inline_query(
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
-    let entities = queries::find_entities(&db, user_id, tags).await?;
+    let entities =
+        queries::find_entities(&db, user_id, tags, 0, EntitySort::MostUsed).await?;
 
     if entities.len() == 0 {
         send_inline_results(
@@ -72,7 +74,8 @@ async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> 
 
     log::debug!("Sending all stickers for {:?}", user_id);
 
-    let entities = queries::list_entities(&db, user_id).await?;
+    let entities =
+        queries::list_entities(&db, user_id, 0, EntitySort::MostUsed).await?;
 
     if entities.len() == 0 {
         send_inline_results(

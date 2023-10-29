@@ -30,3 +30,14 @@ pub enum ConversationState {
         entities: Vec<FileMeta>,
     }
 }
+
+#[derive(Clone, PartialEq)]
+pub enum EntitySort {
+    LastAdded,
+    FirstAdded,
+    LastUsed,
+    FirstUsed,
+    MostUsed,
+    LeastUsed,
+}
+

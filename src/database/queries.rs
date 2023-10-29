@@ -1,10 +1,10 @@
-use sqlx::{Error, Executor, QueryBuilder, Sqlite};
+use sqlx::{Error, QueryBuilder, Sqlite};
 
 use crate::database::entities::{Entity, EntityStat, EntityType};
-use crate::types::DbConn;
-use crate::{main, util};
+use crate::types::{DbConn, EntitySort};
+use crate::util;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct InsertEntity {
     pub entity_id: String,
     pub file_id: String,
@@ -85,25 +85,6 @@ pub async fn insert_tags(
     Ok(())
 }
 
-pub async fn wipe_tags(db: &DbConn, user_id: String, entity_id: String) -> Result<(), Error> {
-    log::debug!(
-        "wipe_tags for entity_id: {:?} and user_id: {:?}",
-        entity_id,
-        user_id
-    );
-
-    sqlx::query(
-        "DELETE FROM entity_main \
-        WHERE entity_id = $1 AND user_id = $2",
-    )
-    .bind(entity_id)
-    .bind(user_id)
-    .execute(db)
-    .await?;
-
-    Ok(())
-}
-
 pub async fn remove_tags(
     db: &DbConn,
     user_id: String,
@@ -146,6 +127,39 @@ pub async fn remove_tags(
     Ok(())
 }
 
+pub async fn wipe_tags(db: &DbConn, user_id: String, entity_id: String) -> Result<(), Error> {
+    log::debug!(
+        "wipe_tags for entity_id: {:?} and user_id: {:?}",
+        entity_id,
+        user_id
+    );
+
+    sqlx::query(
+        "DELETE FROM entity_main \
+        WHERE entity_id = $1 AND user_id = $2",
+    )
+    .bind(entity_id)
+    .bind(user_id)
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
+    log::debug!("wipe_user for user_id: {:?}", user_id);
+
+    sqlx::query(
+        "DELETE FROM entity_main \
+        WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn get_tags(
     db: &DbConn,
     user_id: String,
@@ -177,24 +191,14 @@ pub async fn get_tags(
     Ok(result)
 }
 
-pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
-    log::debug!("wipe_user for user_id: {:?}", user_id);
-
-    sqlx::query(
-        "DELETE FROM entity_main \
-        WHERE user_id = $1",
-    )
-    .bind(user_id)
-    .execute(db)
-    .await?;
-
-    Ok(())
-}
+/// Search ===============================
 
 pub async fn find_entities(
     db: &DbConn,
     user_id: String,
     tags: Vec<String>,
+    page: i32,
+    sort: EntitySort,
 ) -> Result<Vec<Entity>, Error> {
     log::debug!("find_entities: {:?} for user_id: {:?}", tags, user_id);
 
@@ -224,7 +228,12 @@ pub async fn find_entities(
     Ok(result)
 }
 
-pub async fn list_entities(db: &DbConn, user_id: String) -> Result<Vec<Entity>, Error> {
+pub async fn list_entities(
+    db: &DbConn,
+    user_id: String,
+    page: i32,
+    sort: EntitySort,
+) -> Result<Vec<Entity>, Error> {
     log::debug!("list_entities for user_id: {:?}", user_id);
 
     let result: Vec<Entity> = sqlx::query_as(
@@ -244,6 +253,8 @@ pub async fn list_entities(db: &DbConn, user_id: String) -> Result<Vec<Entity>, 
 
     Ok(result)
 }
+
+/// Stats ===============================
 
 pub async fn increase_entity_stat(
     db: &DbConn,

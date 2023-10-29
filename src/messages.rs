@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::{FileMeta, Me};
@@ -125,7 +124,7 @@ pub async fn verify_stop(
 }
 
 pub async fn receive_entities_ids(
-    db: Arc<DbConn>,
+    _db: Arc<DbConn>,
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
