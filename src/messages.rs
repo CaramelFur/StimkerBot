@@ -23,10 +23,10 @@ enum Command {
     #[command(description = "Add or remove tags to an entire stickerpack")]
     Pack,
 
-    #[command(description = "Export your data to a json")]
+    #[command(description = "Export your data")]
     Export,
 
-    #[command(description = "Import your data from a json")]
+    #[command(description = "Import your data")]
     Import,
 
     #[command(description = "Import your data from a QuickStickBot export")]
@@ -203,8 +203,11 @@ async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerRe
 
     let data = import::export_botimport(&db, user_id).await?;
 
-    bot.send_document(msg.chat.id, InputFile::memory(data).file_name("export.json"))
-        .await?;
+    bot.send_document(
+        msg.chat.id,
+        InputFile::memory(data).file_name("export.stimkerbot"),
+    )
+    .await?;
 
     Ok(())
 }
@@ -501,8 +504,7 @@ pub async fn receive_entity_tags(
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
-    entity: FileMeta,
-    entity_type: EntityType,
+    (entity, entity_type): (FileMeta, EntityType),
 ) -> HandlerResult {
     if msg.text().is_none() {
         bot.send_message(

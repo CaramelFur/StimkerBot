@@ -1,13 +1,15 @@
+use crate::types::{DbConn, HandlerResult};
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use serde;
 use serde::{Deserialize, Serialize};
 use sqlx::QueryBuilder;
 
-use crate::types::{DbConn, HandlerResult};
-
 use super::entities::EntityType;
 use std::collections::HashSet;
+use std::io::{Read, Write};
 
-// Serde object for [{"id":"AgADbgoAAtfwRQY","fileId":"CAACAgEAAxkBAAMYZT_z-AP_IWmM1aPKlzcIoEQsZ4UAAm4KAALX8EUG8J8EHnzA7KIwBA","tags":["tes"],"set":"XykYote","isAnimated":false}]
 type QSBotImport = Vec<QSBotImportItem>;
 
 #[derive(Deserialize, Debug)]
@@ -49,21 +51,30 @@ type BotImport = Vec<ImportItem>;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct ImportItem {
+    #[serde(rename = "id")]
     entity_id: String,
 
+    #[serde(rename = "fi")]
     file_id: String,
+    #[serde(rename = "tp")]
     entity_type: EntityType,
-
+    #[serde(rename = "t")]
     tags: Vec<String>,
 
+    #[serde(rename = "c")]
     count: i64,
+    #[serde(rename = "lu")]
     last_used: i64,
+    #[serde(rename = "ca")]
     created_at: i64,
 }
 
 pub async fn import_json(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
-    // Parse the file
-    let import: BotImport = serde_json::from_slice(&file)?;
+    let mut decompressor = GzDecoder::new(file.as_slice());
+    let mut decompressed = Vec::new();
+    decompressor.read_to_end(&mut decompressed)?;
+
+    let import: BotImport = serde_json::from_slice(&decompressed)?;
 
     import_botimport(db, user_id, import).await
 }
@@ -82,6 +93,13 @@ async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> Ha
             let unqiue_tags: HashSet<String> = import
                 .iter()
                 .flat_map(|item| item.tags.to_owned())
+                .map(|tag| {
+                    tag.to_lowercase()
+                        .replace(",", "")
+                        .replace(" ", "")
+                        .trim()
+                        .to_string()
+                })
                 .collect();
             unqiue_tags.into_iter().collect()
         };
@@ -175,18 +193,21 @@ async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> Ha
     // Insert all tag relations
     {
         for entity in import {
-            let mut insert_main_query =
-                QueryBuilder::new("INSERT OR IGNORE INTO entity_main (combo_id, tag_id) ");
-            insert_main_query.push_values(entity.tags, |mut b, tag_name| {
-                b.push("(SELECT combo_id FROM entity_data WHERE entity_id = ")
-                    .push_bind_unseparated(entity.entity_id.clone())
-                    .push_unseparated(" AND user_id = ")
-                    .push_bind_unseparated(user_id.clone())
-                    .push_unseparated(")");
-                b.push("(SELECT tag_id FROM entity_tag WHERE tag_name = ")
-                    .push_bind_unseparated(tag_name)
-                    .push_unseparated(")");
+            let mut insert_main_query = QueryBuilder::new(
+                "INSERT OR IGNORE INTO entity_main (combo_id, tag_id) \
+                    SELECT (SELECT combo_id FROM entity_data WHERE entity_id = ",
+            );
+            insert_main_query.push_bind(&entity.entity_id);
+            insert_main_query.push(" AND user_id = ");
+            insert_main_query.push_bind(&user_id);
+            insert_main_query
+                .push("), tag_id FROM (SELECT tag_id FROM entity_tag WHERE tag_name IN (");
+            let mut seperator = insert_main_query.separated(", ");
+            entity.tags.iter().for_each(|tag_name| {
+                seperator.push_bind(tag_name);
             });
+            insert_main_query.push("))");
+
             insert_main_query
                 .build()
                 .execute(transaction.as_mut())
@@ -203,11 +224,52 @@ async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> Ha
     Ok(())
 }
 
-pub async fn export_botimport(db: &DbConn, user_id: String) -> HandlerResult<Vec<u8>> {
-  // TODO:
+#[derive(Debug, sqlx::FromRow)]
+struct ExportItem {
+    entity_id: String,
 
-    // "testing" to ascii u8
-    let data = "testing";
-    let vec: Vec<u8> = data.bytes().collect();
-    Ok(vec)
+    file_id: String,
+    entity_type: EntityType,
+
+    tags: String,
+
+    count: i64,
+    last_used: i64,
+    created_at: i64,
+}
+
+pub async fn export_botimport(db: &DbConn, user_id: String) -> HandlerResult<Vec<u8>> {
+    log::debug!("Exporting for user {}", user_id);
+
+    let results: Vec<ExportItem> = sqlx::query_as(
+        "SELECT entity_data.entity_id, entity_file.file_id, entity_file.entity_type, group_concat(entity_tag.tag_name, \" \") as tags, entity_data.count, entity_data.last_used, entity_data.created_at FROM entity_main \
+        JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
+        JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
+        JOIN entity_file ON entity_file.entity_id = entity_data.entity_id \
+        WHERE entity_data.user_id = $1 \
+        GROUP BY entity_data.entity_id"
+    ).bind(&user_id).fetch_all(db).await?;
+
+    let import: BotImport = results
+        .into_iter()
+        .map(|item| ImportItem {
+            entity_id: item.entity_id,
+            file_id: item.file_id,
+            entity_type: item.entity_type,
+            tags: item.tags.split(" ").map(|s| s.to_string()).collect(),
+            count: item.count,
+            last_used: item.last_used,
+            created_at: item.created_at,
+        })
+        .collect();
+
+    log::debug!("Exported {} items", import.len());
+
+    let json = serde_json::to_vec(&import)?;
+
+    let mut compressor = GzEncoder::new(Vec::new(), Compression::best());
+    compressor.write_all(json.as_slice())?;
+    let compressed = compressor.finish()?;
+
+    Ok(compressed)
 }

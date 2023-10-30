@@ -72,20 +72,24 @@ pub async fn insert_tags(
         .execute(transaction.as_mut())
         .await?;
 
+    // TODO: Improve this
     for entity in entities {
         // Insert a relation between the entity and the tag
         let mut insert_main_query: QueryBuilder<'_, Sqlite> =
-            QueryBuilder::new("INSERT OR IGNORE INTO entity_main (combo_id, tag_id) ");
-        insert_main_query.push_values(tag_names.clone(), |mut b, tag_name| {
-            b.push("(SELECT combo_id FROM entity_data WHERE entity_id = ")
-                .push_bind_unseparated(entity.entity_id.clone())
-                .push_unseparated(" AND user_id = ")
-                .push_bind_unseparated(user_id.clone())
-                .push_unseparated(")");
-            b.push("(SELECT tag_id FROM entity_tag WHERE tag_name = ")
-                .push_bind_unseparated(tag_name)
-                .push_unseparated(")");
+            QueryBuilder::new(
+                "INSERT OR IGNORE INTO entity_main (combo_id, tag_id) \
+                SELECT (SELECT combo_id FROM entity_data WHERE entity_id = ",
+            );
+        insert_main_query.push_bind(&entity.entity_id);
+        insert_main_query.push(" AND user_id = ");
+        insert_main_query.push_bind(&user_id);
+        insert_main_query.push("), tag_id FROM (SELECT tag_id FROM entity_tag WHERE tag_name IN (");
+        let mut seperator = insert_main_query.separated(", ");
+        tag_names.iter().for_each(|tag_name| {
+            seperator.push_bind(tag_name);
         });
+        insert_main_query.push("))");
+
         insert_main_query
             .build()
             .execute(transaction.as_mut())
@@ -126,14 +130,14 @@ pub async fn remove_tags(
     query_builder.push_bind(user_id);
     query_builder.push(" AND entity_id IN (");
     let mut seperator = query_builder.separated(", ");
-    entity_ids.iter().for_each(|entity_id| {
+    entity_ids.into_iter().for_each(|entity_id| {
         seperator.push_bind(entity_id);
     });
     query_builder.push("))");
     query_builder.push(" AND tag_id IN (");
     query_builder.push("SELECT tag_id FROM entity_tag WHERE tag_name IN (");
     seperator = query_builder.separated(", ");
-    tag_names.iter().for_each(|tag_name| {
+    tag_names.into_iter().for_each(|tag_name| {
         seperator.push_bind(tag_name);
     });
     query_builder.push("))");
@@ -236,6 +240,8 @@ pub async fn find_entities(
 
     log::debug!("find_entities: {:?} for user_id: {:?}", query.tags, user_id);
 
+    let tags_len: i32 = query.tags.len() as i32;
+
     let mut query_builder = QueryBuilder::new(
         "SELECT entity_data.entity_id, entity_data.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
         JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
@@ -245,13 +251,13 @@ pub async fn find_entities(
     query_builder.push(" WHERE entity_data.user_id = ");
     query_builder.push_bind(user_id);
     query_builder.push(" AND entity_tag.tag_name IN (");
-    query_builder.push_values(query.tags.iter(), |mut b, tag_name| {
+    query_builder.push_values(query.tags.into_iter(), |mut b, tag_name| {
         b.push_bind(tag_name);
     });
     query_builder.push(")");
     query_builder.push(" GROUP BY entity_main.combo_id"); // Since we filter by user, this is possible
     query_builder.push(" HAVING COUNT(entity_tag.tag_name) >= ");
-    query_builder.push_bind(query.tags.len() as i32);
+    query_builder.push_bind(tags_len);
     query_builder.push(" ORDER BY ");
     query_builder.push(query.sort.to_sql());
     query_builder.push(" LIMIT 50");
