@@ -72,7 +72,6 @@ pub async fn insert_tags(
         .execute(transaction.as_mut())
         .await?;
 
-    // TODO: Improve this
     for entity in entities {
         // Insert a relation between the entity and the tag
         let mut insert_main_query: QueryBuilder<'_, Sqlite> =
@@ -234,7 +233,7 @@ pub async fn find_entities(
     query: InlineSearchQuery,
     page: i32,
 ) -> Result<Vec<Entity>, Error> {
-    if (query.get_all) {
+    if query.get_all {
         return list_entities(db, user_id, query.sort, page).await;
     }
 
@@ -273,7 +272,7 @@ async fn list_entities(
     db: &DbConn,
     user_id: String,
     sort: EntitySort,
-    page: i32,
+    _page: i32,
 ) -> Result<Vec<Entity>, Error> {
     log::debug!("list_entities for user_id: {:?}", user_id);
 

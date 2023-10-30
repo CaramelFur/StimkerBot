@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use teloxide::net::Download;
-use teloxide::payloads::SendDocumentSetters;
 use teloxide::prelude::*;
 use teloxide::types::{FileMeta, InputFile, Me};
 use teloxide::utils::command::BotCommands;
