@@ -1,7 +1,7 @@
 use sqlx::{Error, QueryBuilder, Sqlite};
 
 use crate::database::entities::{Entity, EntityStat, EntityType};
-use crate::types::{DbConn, EntitySort};
+use crate::types::{DbConn, EntitySort, InlineSearchQuery};
 use crate::util;
 
 #[derive(Debug, Default, Clone)]
@@ -60,7 +60,7 @@ pub async fn insert_tags(
     log::debug!("insert_tags: file inserted");
 
     // Insert the user/entity combo
-    let mut insert_ue_query = 
+    let mut insert_ue_query =
         QueryBuilder::new("INSERT OR IGNORE INTO entity_data (entity_id, user_id, created_at) ");
     insert_ue_query.push_values(&entities, |mut b, entity| {
         b.push_bind(entity.entity_id.clone());
@@ -128,9 +128,8 @@ pub async fn remove_tags(
     let mut seperator = query_builder.separated(", ");
     entity_ids.iter().for_each(|entity_id| {
         seperator.push_bind(entity_id);
-        
     });
-    query_builder.push("))");    
+    query_builder.push("))");
     query_builder.push(" AND tag_id IN (");
     query_builder.push("SELECT tag_id FROM entity_tag WHERE tag_name IN (");
     seperator = query_builder.separated(", ");
@@ -228,11 +227,14 @@ pub async fn get_tags(
 pub async fn find_entities(
     db: &DbConn,
     user_id: String,
-    tags: Vec<String>,
+    query: InlineSearchQuery,
     page: i32,
-    sort: EntitySort,
 ) -> Result<Vec<Entity>, Error> {
-    log::debug!("find_entities: {:?} for user_id: {:?}", tags, user_id);
+    if (query.get_all) {
+        return list_entities(db, user_id, query.sort, page).await;
+    }
+
+    log::debug!("find_entities: {:?} for user_id: {:?}", query.tags, user_id);
 
     let mut query_builder = QueryBuilder::new(
         "SELECT entity_data.entity_id, entity_data.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
@@ -243,14 +245,15 @@ pub async fn find_entities(
     query_builder.push(" WHERE entity_data.user_id = ");
     query_builder.push_bind(user_id);
     query_builder.push(" AND entity_tag.tag_name IN (");
-    query_builder.push_values(tags.iter(), |mut b, tag_name| {
+    query_builder.push_values(query.tags.iter(), |mut b, tag_name| {
         b.push_bind(tag_name);
     });
     query_builder.push(")");
     query_builder.push(" GROUP BY entity_main.combo_id"); // Since we filter by user, this is possible
     query_builder.push(" HAVING COUNT(entity_tag.tag_name) >= ");
-    query_builder.push_bind(tags.len() as i32);
-    query_builder.push(" ORDER BY entity_data.count DESC");
+    query_builder.push_bind(query.tags.len() as i32);
+    query_builder.push(" ORDER BY ");
+    query_builder.push(query.sort.to_sql());
     query_builder.push(" LIMIT 50");
 
     let result: Vec<Entity> = query_builder.build_query_as().fetch_all(db).await?;
@@ -260,22 +263,25 @@ pub async fn find_entities(
     Ok(result)
 }
 
-pub async fn list_entities(
+async fn list_entities(
     db: &DbConn,
     user_id: String,
-    page: i32,
     sort: EntitySort,
+    page: i32,
 ) -> Result<Vec<Entity>, Error> {
     log::debug!("list_entities for user_id: {:?}", user_id);
 
     let result: Vec<Entity> = sqlx::query_as(
-        "SELECT entity_data.entity_id, entity_data.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
-        JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
-        JOIN entity_file ON entity_file.entity_id = entity_data.entity_id \
-        WHERE entity_data.user_id = $1 \
-        GROUP BY entity_main.combo_id \
-        ORDER BY entity_data.count DESC \
-        LIMIT 50",
+        format!(
+            "SELECT entity_data.entity_id, entity_data.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
+            JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
+            JOIN entity_file ON entity_file.entity_id = entity_data.entity_id \
+            WHERE entity_data.user_id = $1 \
+            GROUP BY entity_main.combo_id \
+            ORDER BY {} \
+            LIMIT 50",
+            sort.to_sql()
+        ).as_str() 
     )
     .bind(user_id)
     .fetch_all(db)

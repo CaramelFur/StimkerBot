@@ -4,11 +4,13 @@ use teloxide::prelude::*;
 
 use teloxide::types::*;
 
+use crate::database::entities::EntityType;
 use crate::database::queries;
 use crate::types::BotType;
 use crate::types::DbConn;
 use crate::types::EntitySort;
 use crate::types::HandlerResult;
+use crate::types::InlineSearchQuery;
 
 pub async fn handler_inline_query(
     db: Arc<DbConn>,
@@ -19,10 +21,6 @@ pub async fn handler_inline_query(
 
     // Check if query is empty
     if query.query.len() < 3 {
-        if query.query == "*" {
-            return handler_send_all(db, bot, query).await;
-        }
-
         log::debug!("Query too short: \"{:?}\" for {:?}", query.query, user_id);
 
         send_inline_results(
@@ -37,18 +35,12 @@ pub async fn handler_inline_query(
     }
 
     // Split query by spaces into string vector
-    let tags: Vec<String> = query
-        .query
-        .to_lowercase()
-        .replace(",", " ")
-        .split(" ")
-        .map(|s| s.trim().to_string())
-        .collect();
+    let search_query = parse_search(&query.query);
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
     let entities =
-        queries::find_entities(&db, user_id, tags, 0, EntitySort::MostUsed).await?;
+        queries::find_entities(&db, user_id, search_query, 0).await?;
 
     if entities.len() == 0 {
         send_inline_results(
@@ -69,30 +61,71 @@ pub async fn handler_inline_query(
     Ok(())
 }
 
-async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> HandlerResult {
-    let user_id = query.from.id.to_string();
 
-    log::debug!("Sending all stickers for {:?}", user_id);
+fn parse_search(input: &String) -> InlineSearchQuery {
+    let mut query = InlineSearchQuery::default();
 
-    let entities =
-        queries::list_entities(&db, user_id, 0, EntitySort::MostUsed).await?;
+    let tags: Vec<String> = input
+        .to_lowercase()
+        .replace(",", " ")
+        .split(" ")
+        .map(|s| s.trim().to_string().to_owned())
+        .filter(|tag| !tag.is_empty())
+        .filter(|tag| match tag.as_str() {
+            "all" => {
+                query.get_all = true;
+                false
+            }
+            "sticker" => {
+                query.entity_type = Some(EntityType::Sticker);
+                false
+            }
+            "animation" => {
+                query.entity_type = Some(EntityType::Animation);
+                false
+            }
+            "photo" => {
+                query.entity_type = Some(EntityType::Photo);
+                false
+            }
+            "video" => {
+                query.entity_type = Some(EntityType::Video);
+                false
+            }
+            "most_used" => {
+                query.sort = EntitySort::MostUsed;
+                false
+            }
+            "least_used" => {
+                query.sort = EntitySort::LeastUsed;
+                false
+            }
+            "last_added" => {
+                query.sort = EntitySort::LastAdded;
+                false
+            }
+            "first_added" => {
+                query.sort = EntitySort::FirstAdded;
+                false
+            }
+            "last_used" => {
+                query.sort = EntitySort::LastUsed;
+                false
+            }
+            "first_used" => {
+                query.sort = EntitySort::FirstUsed;
+                false
+            }
+            _ => true,
+        })
+        .collect();
 
-    if entities.len() == 0 {
-        send_inline_results(
-            &bot,
-            query.id,
-            vec![create_text_result("No stickers found".to_string())],
-        )
-        .await?;
-        return Ok(());
-    }
+    query.tags = tags;
 
-    log::debug!("Found all stickers: {:?}", entities);
-
-    let results = entities.iter().map(|sticker| sticker.to_inline());
-
-    send_inline_results(&bot, query.id, results).await
+    query
 }
+
+// ===================================================================
 
 pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) -> HandlerResult {
     let user_id = query.from.id.to_string();

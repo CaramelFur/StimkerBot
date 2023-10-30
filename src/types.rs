@@ -31,13 +31,34 @@ pub enum ConversationState {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub enum EntitySort {
     LastAdded,
     FirstAdded,
     LastUsed,
     FirstUsed,
+    #[default]
     MostUsed,
     LeastUsed,
 }
 
+impl EntitySort {
+    pub fn to_sql(&self) -> &'static str {
+        match self {
+            EntitySort::LastAdded => "entity_data.created_at DESC",
+            EntitySort::FirstAdded => "entity_data.created_at ASC",
+            EntitySort::LastUsed => "entity_data.last_used DESC",
+            EntitySort::FirstUsed => "entity_data.last_used ASC",
+            EntitySort::MostUsed => "entity_data.count DESC",
+            EntitySort::LeastUsed => "entity_data.count ASC",
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Default)]
+pub struct InlineSearchQuery {
+    pub tags: Vec<String>,
+    pub sort: EntitySort,
+    pub entity_type: Option<EntityType>,
+    pub get_all: bool,
+}
