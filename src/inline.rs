@@ -1,20 +1,17 @@
-use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use teloxide::payloads;
 use teloxide::prelude::*;
 
-use teloxide::types::InlineQueryResult;
-use teloxide::types::InlineQueryResultArticle;
-use teloxide::types::InlineQueryResultCachedSticker;
-use teloxide::types::InputMessageContent;
-use teloxide::types::InputMessageContentText;
+use teloxide::types::*;
 
-use crate::database;
-use crate::dialogue::BotType;
-use crate::dialogue::HandlerResult;
+use crate::database::queries;
+use crate::types::BotType;
+use crate::types::DbConn;
+use crate::types::EntitySort;
+use crate::types::HandlerResult;
 
 pub async fn handler_inline_query(
-    db: Arc<DatabaseConnection>,
+    db: Arc<DbConn>,
     bot: BotType,
     query: InlineQuery,
 ) -> HandlerResult {
@@ -50,9 +47,10 @@ pub async fn handler_inline_query(
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
-    let stickers = database::find_stickers(&db, user_id, tags).await?;
+    let entities =
+        queries::find_entities(&db, user_id, tags, 0, EntitySort::MostUsed).await?;
 
-    if stickers.len() == 0 {
+    if entities.len() == 0 {
         send_inline_results(
             &bot,
             query.id,
@@ -62,34 +60,24 @@ pub async fn handler_inline_query(
         return Ok(());
     }
 
-    log::debug!("Found stickers: {:?}", stickers);
+    log::debug!("Found stickers: {:?}", entities);
 
-    let results = stickers.iter().map(|sticker| {
-        InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.sticker_id.to_owned()),
-            sticker_file_id: sticker.file_id.to_owned(),
-            input_message_content: None,
-            reply_markup: None,
-        })
-    });
+    let results = entities.iter().map(|sticker| sticker.to_inline());
 
     send_inline_results(&bot, query.id, results).await?;
 
     Ok(())
 }
 
-async fn handler_send_all(
-    db: Arc<DatabaseConnection>,
-    bot: BotType,
-    query: InlineQuery,
-) -> HandlerResult {
+async fn handler_send_all(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
     log::debug!("Sending all stickers for {:?}", user_id);
 
-    let stickers = database::list_stickers(&db, user_id).await?;
+    let entities =
+        queries::list_entities(&db, user_id, 0, EntitySort::MostUsed).await?;
 
-    if stickers.len() == 0 {
+    if entities.len() == 0 {
         send_inline_results(
             &bot,
             query.id,
@@ -99,33 +87,19 @@ async fn handler_send_all(
         return Ok(());
     }
 
-    log::debug!("Found all stickers: {:?}", stickers);
+    log::debug!("Found all stickers: {:?}", entities);
 
-    let results = stickers.iter().map(|sticker| {
-        InlineQueryResult::CachedSticker(InlineQueryResultCachedSticker {
-            id: format!("{}", sticker.sticker_id.to_owned()),
-            sticker_file_id: sticker.file_id.to_owned(),
-            input_message_content: None,
-            reply_markup: None,
-        })
-    });
+    let results = entities.iter().map(|sticker| sticker.to_inline());
 
     send_inline_results(&bot, query.id, results).await
 }
 
-pub async fn handle_inline_choice(
-    db: Arc<DatabaseConnection>,
-    query: ChosenInlineResult,
-) -> HandlerResult {
+pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
-    log::debug!(
-        "Chosen inline result: {:?} by user {:?}",
-        query,
-        user_id
-    );
+    log::debug!("Chosen inline result: {:?} by user {:?}", query, user_id);
 
-    database::increase_sticker_stat(&db, user_id, query.result_id).await?;
+    queries::increase_entity_stat(&db, user_id, query.result_id).await?;
 
     Ok(())
 }
