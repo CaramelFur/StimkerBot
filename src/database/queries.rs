@@ -152,8 +152,8 @@ pub async fn wipe_tags(db: &DbConn, user_id: String, entity_id: String) -> Resul
 
     sqlx::query(
         "DELETE FROM entity_main \
-        JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
-        WHERE entity_data.entity_id = $1 AND entity_data.user_id = $2",
+        WHERE combo_id IN \
+        (SELECT combo_id FROM entity_data WHERE entity_id = $1 AND user_id = $2)",
     )
     .bind(entity_id)
     .bind(user_id)
@@ -170,8 +170,8 @@ pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
 
     sqlx::query(
         "DELETE FROM entity_main \
-        JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
-        WHERE entity_data.user_id = $1",
+        WHERE combo_id IN \
+        (SELECT combo_id FROM entity_data WHERE user_id = $1)",
     )
     .bind(user_id.clone())
     .execute(transaction.as_mut())
