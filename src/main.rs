@@ -27,45 +27,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dptree::filter(|msg: Message| msg.text().map(|t| t.starts_with("/")).unwrap_or(false))
             .endpoint(messages::command_handler);
 
-    let message_verify_stop_tree = dptree::case![ConversationState::VerifyStop].endpoint({
-        let db = db.clone(); // whyyyyy
-        move |bot, dialogue, msg| messages::verify_stop(db.clone(), bot, dialogue, msg)
-    });
+    let message_recieve_qsimport_tree =
+        dptree::case![ConversationState::ReceiveQSImport].endpoint(messages::receive_qs_import);
+
+    let message_recieve_botimport_tree =
+        dptree::case![ConversationState::ReceiveBotImport].endpoint(messages::receive_bot_import);
+
+    let message_verify_stop_tree =
+        dptree::case![ConversationState::VerifyStop].endpoint(messages::verify_stop);
 
     let message_receive_entities_ids_tree = dptree::case![ConversationState::RecieveEntitiesId]
-        .endpoint({
-            let db = db.clone(); // whyyyyy
-            move |bot, dialogue, msg| messages::receive_entities_ids(db.clone(), bot, dialogue, msg)
-        });
+        .endpoint(messages::receive_entities_ids);
 
     let message_receive_entities_tags_tree =
-        dptree::case![ConversationState::RecieveEntitiesTags { entities }].endpoint({
-            let db = db.clone();
-            move |bot, dialogue, entities, msg| {
-                messages::receive_entities_tags(db.clone(), bot, dialogue, msg, entities)
-            }
-        });
+        dptree::case![ConversationState::RecieveEntitiesTags { entities }]
+            .endpoint(messages::receive_entities_tags);
 
-    let message_receive_entity_id_tree = dptree::case![ConversationState::ReceiveEntityId]
-        .endpoint({
-            let db = db.clone(); // whyyyyy
-            move |bot, dialogue, msg| messages::receive_entity_id(db.clone(), bot, dialogue, msg)
-        });
+    let message_receive_entity_id_tree =
+        dptree::case![ConversationState::ReceiveEntityId].endpoint(messages::receive_entity_id);
 
     let message_receive_entity_tags_tree = dptree::case![ConversationState::ReceiveEntityTags {
         entity,
         entity_type
     }]
-    .endpoint({
-        let db = db.clone();
-        move |bot, dialogue, (entity, entity_type), msg| {
-            messages::receive_entity_tags(db.clone(), bot, dialogue, msg, entity, entity_type)
-        }
-    });
+    .endpoint(messages::receive_entity_tags);
 
     let message_tree = Update::filter_message()
         .enter_dialogue::<Message, InMemStorage<ConversationState>, ConversationState>()
         .branch(command_handler)
+        .branch(message_recieve_qsimport_tree)
+        .branch(message_recieve_botimport_tree)
         .branch(message_verify_stop_tree)
         .branch(message_receive_entities_ids_tree)
         .branch(message_receive_entities_tags_tree)
@@ -90,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("Starting dispatcher");
 
     Dispatcher::builder(bot, tree)
-        .dependencies(dptree::deps![InMemStorage::<ConversationState>::new()])
+        .dependencies(dptree::deps![InMemStorage::<ConversationState>::new(), db])
         .enable_ctrlc_handler()
         .build()
         .dispatch()

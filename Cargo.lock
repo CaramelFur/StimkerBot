@@ -1913,6 +1913,8 @@ dependencies = [
  "dotenv",
  "log",
  "pretty_env_logger",
+ "serde",
+ "serde_json",
  "sqlx",
  "teloxide",
  "time-humanize",

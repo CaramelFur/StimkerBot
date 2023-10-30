@@ -7,7 +7,7 @@ use teloxide::{
 
 use crate::database::entities::EntityType;
 
-pub type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+pub type HandlerResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub type DialogueWithState = Dialogue<ConversationState, InMemStorage<ConversationState>>;
 
 pub type BotType = DefaultParseMode<Bot>;
@@ -28,7 +28,10 @@ pub enum ConversationState {
     RecieveEntitiesId,
     RecieveEntitiesTags {
         entities: Vec<FileMeta>,
-    }
+    },
+
+    ReceiveQSImport,
+    ReceiveBotImport,
 }
 
 #[derive(Clone, PartialEq, Default)]

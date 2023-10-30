@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use teloxide::types::*;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(rename_all = "lowercase")]
 pub enum EntityType {
     Sticker,
@@ -29,18 +30,10 @@ pub struct EntityStat {
 impl Entity {
     pub fn to_inline(&self) -> InlineQueryResult {
         match self.entity_type {
-            EntityType::Sticker => InlineQueryResult::CachedSticker(
-                self.to_cached_sticker()
-            ),
-            EntityType::Animation => InlineQueryResult::CachedGif(
-                self.to_cached_animation()
-            ),
-            EntityType::Photo => InlineQueryResult::CachedPhoto(
-                self.to_cached_photo()
-            ),
-            EntityType::Video => InlineQueryResult::CachedVideo(
-                self.to_cached_video()
-            ),
+            EntityType::Sticker => InlineQueryResult::CachedSticker(self.to_cached_sticker()),
+            EntityType::Animation => InlineQueryResult::CachedGif(self.to_cached_animation()),
+            EntityType::Photo => InlineQueryResult::CachedPhoto(self.to_cached_photo()),
+            EntityType::Video => InlineQueryResult::CachedVideo(self.to_cached_video()),
         }
     }
 

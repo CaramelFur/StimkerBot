@@ -1,12 +1,15 @@
 use std::sync::Arc;
+use teloxide::net::Download;
+use teloxide::payloads::SendDocumentSetters;
 use teloxide::prelude::*;
-use teloxide::types::{FileMeta, Me};
+use teloxide::types::{FileMeta, InputFile, Me};
 use teloxide::utils::command::BotCommands;
 
 use crate::database::entities::EntityType;
+use crate::database::import;
 use crate::database::queries::{self, InsertEntity};
-use crate::types::*;
 use crate::util::unix_to_humantime;
+use crate::{database, types::*};
 
 #[derive(BotCommands)]
 #[command(rename_rule = "lowercase")]
@@ -26,6 +29,9 @@ enum Command {
     #[command(description = "Import your data from a json")]
     Import,
 
+    #[command(description = "Import your data from a QuickStickBot export")]
+    QuickStickImport,
+
     #[command(description = "Stop whatever you are doing")]
     Cancel,
 
@@ -34,6 +40,7 @@ enum Command {
 }
 
 pub async fn command_handler(
+    db: Arc<DbConn>,
     bot: BotType,
     me: Me,
     dialogue: DialogueWithState,
@@ -72,10 +79,21 @@ pub async fn command_handler(
                 .await?;
         }
         Ok(Command::Export) => {
-            bot.send_message(msg.chat.id, "TODO").await?;
+            send_bot_export(&db, &bot, &msg).await?;
         }
         Ok(Command::Import) => {
-            bot.send_message(msg.chat.id, "TODO").await?;
+            bot.send_message(msg.chat.id, "Please send me the file you got from /export")
+                .await?;
+            dialogue.update(ConversationState::ReceiveBotImport).await?;
+        }
+        Ok(Command::QuickStickImport) => {
+            bot.send_message(
+                msg.chat.id,
+                "Please send me the file you got from QuickStickBot",
+            )
+            .await?;
+
+            dialogue.update(ConversationState::ReceiveQSImport).await?;
         }
         Ok(Command::Cancel) => {
             dialogue.update(ConversationState::ReceiveEntityId).await?;
@@ -95,6 +113,123 @@ pub async fn command_handler(
     }
 
     return Ok(());
+}
+
+pub async fn receive_qs_import(
+    db: Arc<DbConn>,
+    bot: BotType,
+    dialogue: DialogueWithState,
+    msg: Message,
+) -> HandlerResult {
+    dialogue.update(ConversationState::ReceiveEntityId).await?;
+
+    let file_data = extract_file(&bot, &msg).await?;
+
+    let user_id = msg.from().unwrap().id.to_string();
+
+    let change_message = bot
+        .send_message(msg.chat.id, format!("Importing your stickers..."))
+        .await?;
+
+    let result = database::import::import_qsbot(&db, user_id, file_data).await;
+    match result {
+        Ok(_) => {
+            bot.edit_message_text(
+                change_message.chat.id,
+                change_message.id,
+                format!("Imported your stickers!"),
+            )
+            .await?;
+        }
+        Err(e) => {
+            bot.edit_message_text(
+                change_message.chat.id,
+                change_message.id,
+                format!("Failed to import your stickers"),
+            )
+            .await?;
+            log::error!("Failed to import stickers: {:?}", e);
+        }
+    };
+
+    Ok(())
+}
+
+pub async fn receive_bot_import(
+    db: Arc<DbConn>,
+    bot: BotType,
+    dialogue: DialogueWithState,
+    msg: Message,
+) -> HandlerResult {
+    dialogue.update(ConversationState::ReceiveEntityId).await?;
+
+    let file_data = extract_file(&bot, &msg).await?;
+
+    let user_id = msg.from().unwrap().id.to_string();
+
+    let change_message = bot
+        .send_message(msg.chat.id, format!("Importing your stickers..."))
+        .await?;
+
+    let result = database::import::import_json(&db, user_id, file_data).await;
+    match result {
+        Ok(_) => {
+            bot.edit_message_text(
+                change_message.chat.id,
+                change_message.id,
+                format!("Imported your stickers!"),
+            )
+            .await?;
+        }
+        Err(e) => {
+            bot.edit_message_text(
+                change_message.chat.id,
+                change_message.id,
+                format!("Failed to import your stickers"),
+            )
+            .await?;
+            log::error!("Failed to import stickers: {:?}", e);
+        }
+    };
+
+    Ok(())
+}
+
+async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Exporting your stickers...")
+        .await?;
+
+    let user_id = msg.from().unwrap().id.to_string();
+
+    let data = import::export_botimport(&db, user_id).await?;
+
+    bot.send_document(msg.chat.id, InputFile::memory(data).file_name("export.json"))
+        .await?;
+
+    Ok(())
+}
+
+async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
+    // Check if message has a json attachment
+    if msg.document().is_none() {
+        bot.send_message(msg.chat.id, "No file sent, operation cancelled")
+            .await?;
+        return Err("No file sent".into());
+    }
+
+    let doc = msg.document().unwrap();
+
+    if doc.file.size > 50_000_000 {
+        bot.send_message(msg.chat.id, "File too large, operation cancelled")
+            .await?;
+        return Err("File too large".into());
+    }
+
+    let doc_data = bot.get_file(&doc.file.id).await?;
+    let mut file_data = Vec::new();
+    bot.download_file(&doc_data.path, &mut file_data).await?;
+
+    Ok(file_data)
 }
 
 pub async fn verify_stop(
