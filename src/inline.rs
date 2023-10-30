@@ -39,8 +39,7 @@ pub async fn handler_inline_query(
 
     log::debug!("Got inline query: {:?} from {:?}", query, user_id);
 
-    let entities =
-        queries::find_entities(&db, user_id, search_query, 0).await?;
+    let entities = queries::find_entities(&db, user_id, search_query, 0).await?;
 
     if entities.len() == 0 {
         send_inline_results(
@@ -61,7 +60,6 @@ pub async fn handler_inline_query(
     Ok(())
 }
 
-
 fn parse_search(input: &String) -> InlineSearchQuery {
     let mut query = InlineSearchQuery::default();
 
@@ -76,43 +74,43 @@ fn parse_search(input: &String) -> InlineSearchQuery {
                 query.get_all = true;
                 false
             }
-            "sticker" => {
+            "sticker" | "stk" => {
                 query.entity_type = Some(EntityType::Sticker);
                 false
             }
-            "animation" => {
+            "animation" | "gif" => {
                 query.entity_type = Some(EntityType::Animation);
                 false
             }
-            "photo" => {
+            "photo" | "pic" => {
                 query.entity_type = Some(EntityType::Photo);
                 false
             }
-            "video" => {
+            "video" | "vid" => {
                 query.entity_type = Some(EntityType::Video);
                 false
             }
-            "most_used" => {
+            "most_used" | "mu" => {
                 query.sort = EntitySort::MostUsed;
                 false
             }
-            "least_used" => {
+            "least_used" | "lu" => {
                 query.sort = EntitySort::LeastUsed;
                 false
             }
-            "last_added" => {
+            "last_added" | "la" => {
                 query.sort = EntitySort::LastAdded;
                 false
             }
-            "first_added" => {
+            "first_added" | "fa" => {
                 query.sort = EntitySort::FirstAdded;
                 false
             }
-            "last_used" => {
+            "last_used" | "nu" => {
                 query.sort = EntitySort::LastUsed;
                 false
             }
-            "first_used" => {
+            "first_used" | "ou" => {
                 query.sort = EntitySort::FirstUsed;
                 false
             }
