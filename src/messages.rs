@@ -331,10 +331,12 @@ pub async fn receive_entity_id(
             format!(
                 "Your current tags for this are: <b>{}</b>\n\
                 You've used this <code>{}</code> times\n\
-                You've last used this <code>{}</code>",
+                You've last used this <code>{}</code>\n\
+                You've added this sticker <code>{}</code>",
                 current_tags.join(", "),
                 entity_usage.count,
-                unix_to_humantime(entity_usage.last_used)
+                unix_to_humantime(entity_usage.last_used),
+                unix_to_humantime(entity_usage.created_at),
             ),
         )
         .await?;

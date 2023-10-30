@@ -23,6 +23,7 @@ pub struct EntityStat {
     pub entity_id: String,
     pub count: i64,
     pub last_used: i64,
+    pub created_at: i64,
 }
 
 impl Entity {
