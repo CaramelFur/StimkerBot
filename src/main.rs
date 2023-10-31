@@ -1,5 +1,6 @@
 use dotenv::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
+use teloxide::utils::command::BotCommands;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
@@ -77,6 +78,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .branch(message_tree)
         .branch(inline_tree)
         .branch(inline_result_tree);
+
+    log::debug!("Sending commands");
+
+    bot.set_my_commands(messages::Command::bot_commands()).await?;
 
     log::debug!("Starting dispatcher");
 

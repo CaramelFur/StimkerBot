@@ -12,11 +12,11 @@ use crate::{database, types::*};
 
 #[derive(BotCommands)]
 #[command(rename_rule = "lowercase")]
-enum Command {
-    #[command(description = "Show this text")]
+pub enum Command {
+    #[command(description = "Show all help for this bot")]
     Help,
 
-    #[command(description = "Show info about this bot")]
+    #[command(description = "Start using this bot")]
     Start,
 
     #[command(description = "Add or remove tags to an entire stickerpack")]
@@ -29,7 +29,7 @@ enum Command {
     Import,
 
     #[command(description = "Import your data from a QuickStickBot export")]
-    QuickStickImport,
+    QSImport,
 
     #[command(description = "Stop whatever you are doing")]
     Cancel,
@@ -47,23 +47,52 @@ pub async fn command_handler(
 ) -> HandlerResult {
     match Command::parse(msg.text().unwrap(), me.username()) {
         Ok(Command::Help) => {
-            bot.send_message(msg.chat.id, Command::descriptions().to_string())
-                .await?;
+            let command_help = Command::descriptions().to_string();
+            bot.send_message(
+                msg.chat.id,
+                format!(
+                    "<b>General</b>\n\
+                    This bot allows you to tag your stickers, gifs, photos and videos with tags.\n\
+                    You can then search for these tags and send the sticker, gif, photo or video.\n\
+                    Start a search by mentioning me in your chatbox.\n\
+                    \n<b>Tagging</b>\n\
+                    You can tag your stickers, gifs, photos and videos by sending them to me.\n\
+                    I will then ask you which tags you want to add to it.\n\
+                    If you want to tag an enitre stickerpack, use the /pack command.\n\
+                    \n<b>Filters</b>\n\
+                    You can use some special filters to narrow down your search.\n\
+                    - <code>all</code> will show all your stickers, gifs, photos and videos\n\
+                    - <code>sticker</code> or <code>stk</code> will only show stickers\n\
+                    - <code>animation</code> or <code>gif</code> will only show gifs\n\
+                    - <code>photo</code> or <code>pic</code> will only show photos\n\
+                    - <code>video</code> or <code>vid</code> will only show videos\n\
+                    \n<b>Sorting</b>\n\
+                    You can sort your results by using the following filters:\n\
+                    - <code>most_used</code> or <code>mu</code> will sort by most used\n\
+                    - <code>least_used</code> or <code>lu</code> will sort by least used\n\
+                    - <code>last_added</code> or <code>la</code> will sort by last added\n\
+                    - <code>first_added</code> or <code>fa</code> will sort by first added\n\
+                    - <code>last_used</code> or <code>nu</code> will sort by last used\n\
+                    - <code>first_used</code> or <code>ou</code> will sort by first used\n\
+                    \n<b>Commands</b>\n\
+                    {}",
+                    command_help
+                ),
+            )
+            .await?;
         }
         Ok(Command::Start) => {
             bot.send_message(
                 msg.chat.id,
-                "You can start using this bot by sending it a sticker, gif, photo or video",
+                "You can start using this bot by sending it a sticker, gif, photo or video.\n\
+                You can also use /help to get more information",
             )
             .await?;
         }
         Ok(Command::Pack) => {
             if dialogue.get().await?.unwrap() != ConversationState::ReceiveEntityId {
-                bot.send_message(
-                    msg.chat.id,
-                    "Please finish your action, or send /cancel to cancel",
-                )
-                .await?;
+                bot.send_message(msg.chat.id, "Please finish your action, or /cancel")
+                    .await?;
                 return Ok(());
             }
 
@@ -81,14 +110,17 @@ pub async fn command_handler(
             send_bot_export(&db, &bot, &msg).await?;
         }
         Ok(Command::Import) => {
-            bot.send_message(msg.chat.id, "Please send me the file you got from /export")
-                .await?;
-            dialogue.update(ConversationState::ReceiveBotImport).await?;
-        }
-        Ok(Command::QuickStickImport) => {
             bot.send_message(
                 msg.chat.id,
-                "Please send me the file you got from QuickStickBot",
+                "Ready to import, please send me the file you got from /export",
+            )
+            .await?;
+            dialogue.update(ConversationState::ReceiveBotImport).await?;
+        }
+        Ok(Command::QSImport) => {
+            bot.send_message(
+                msg.chat.id,
+                "Ready to import, please send me the file you got from QuickStickBot",
             )
             .await?;
 
