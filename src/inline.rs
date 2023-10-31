@@ -19,35 +19,31 @@ pub async fn handler_inline_query(
 ) -> HandlerResult {
     let user_id = query.from.id.to_string();
 
+    // Parse query.offset as i32 or fallback to 0
+    let page = query.offset.parse::<i32>().unwrap_or(0);
+
     // Check if query is empty
     if query.query.len() < 3 {
         log::debug!("Query too short: \"{:?}\" for {:?}", query.query, user_id);
 
-        send_inline_results(
-            &bot,
-            query.id,
-            vec![create_text_result(
-                "Please enter atleast 3 characters".to_string(),
-            )],
-        )
-        .await?;
+        send_text_result(&bot, query.id, "Please enter atleast 3 characters").await?;
         return Ok(());
     }
 
     // Split query by spaces into string vector
     let search_query = parse_search(&query.query);
 
-    log::debug!("Got inline query: {:?} from {:?}", query, user_id);
+    log::debug!(
+        "Got inline query: {:?} from {:?} at page {}",
+        query,
+        user_id,
+        page
+    );
 
-    let entities = queries::find_entities(&db, user_id, search_query, 0).await?;
+    let entities = queries::find_entities(&db, user_id, search_query.to_owned(), page).await?;
 
-    if entities.len() == 0 {
-        send_inline_results(
-            &bot,
-            query.id,
-            vec![create_text_result("No stickers found".to_string())],
-        )
-        .await?;
+    if entities.len() == 0 && page == 0 {
+        send_text_result(&bot, query.id, "No stickers found").await?;
         return Ok(());
     }
 
@@ -55,7 +51,17 @@ pub async fn handler_inline_query(
 
     let results = entities.iter().map(|sticker| sticker.to_inline());
 
-    send_inline_results(&bot, query.id, results).await?;
+    send_inline_results(
+        &bot,
+        query.id,
+        results,
+        if search_query.sort != EntitySort::Random {
+            Some(page + 1)
+        } else {
+            None
+        },
+    )
+    .await?;
 
     Ok(())
 }
@@ -114,6 +120,10 @@ fn parse_search(input: &String) -> InlineSearchQuery {
                 query.sort = EntitySort::FirstUsed;
                 false
             }
+            "random" | "rnd" => {
+                query.sort = EntitySort::Random;
+                false
+            }
             _ => true,
         })
         .collect();
@@ -135,26 +145,49 @@ pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) ->
     Ok(())
 }
 
-async fn send_inline_results<I, R>(bot: &BotType, inline_query_id: I, results: R) -> HandlerResult
+async fn send_inline_results<I, R>(
+    bot: &BotType,
+    inline_query_id: I,
+    results: R,
+    next_page: Option<i32>,
+) -> HandlerResult
 where
     I: Into<String>,
     R: IntoIterator<Item = InlineQueryResult>,
 {
-    <Bot as Requester>::AnswerInlineQuery::new(
-        bot.inner().clone(),
-        payloads::AnswerInlineQuery::new(inline_query_id, results)
-            .cache_time(5)
-            .is_personal(true),
-    )
-    .await?;
+    let mut payload = payloads::AnswerInlineQuery::new(inline_query_id, results)
+        .cache_time(5)
+        .is_personal(true);
+
+    if let Some(next_page) = next_page {
+        payload = payload.next_offset(next_page.to_string());
+    }
+
+    <Bot as Requester>::AnswerInlineQuery::new(bot.inner().clone(), payload).await?;
 
     Ok(())
 }
 
-fn create_text_result(text: String) -> InlineQueryResult {
-    InlineQueryResult::Article(InlineQueryResultArticle::new(
+async fn send_text_result<I, R>(bot: &BotType, inline_query_id: I, text: R) -> HandlerResult
+where
+    I: Into<String>,
+    R: Into<String>,
+{
+    let results = vec![InlineQueryResult::Article(InlineQueryResultArticle::new(
         "0",
         text,
         InputMessageContent::Text(InputMessageContentText::new("[error sending sticker]")),
-    ))
+    ))];
+
+    <Bot as Requester>::AnswerInlineQuery::new(
+        bot.inner().clone(),
+        payloads::AnswerInlineQuery::new(inline_query_id, results)
+            .cache_time(5)
+            .is_personal(true)
+            .switch_pm_text("Add a new sticker")
+            .switch_pm_parameter("bot"),
+    )
+    .await?;
+
+    Ok(())
 }

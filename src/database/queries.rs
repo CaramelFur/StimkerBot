@@ -259,7 +259,8 @@ pub async fn find_entities(
     query_builder.push_bind(tags_len);
     query_builder.push(" ORDER BY ");
     query_builder.push(query.sort.to_sql());
-    query_builder.push(" LIMIT 50");
+    query_builder.push(" LIMIT 50 OFFSET ");
+    query_builder.push_bind(page * 50);
 
     let result: Vec<Entity> = query_builder.build_query_as().fetch_all(db).await?;
 
@@ -272,7 +273,7 @@ async fn list_entities(
     db: &DbConn,
     user_id: String,
     sort: EntitySort,
-    _page: i32,
+    page: i32,
 ) -> Result<Vec<Entity>, Error> {
     log::debug!("list_entities for user_id: {:?}", user_id);
 
@@ -284,11 +285,12 @@ async fn list_entities(
             WHERE entity_data.user_id = $1 \
             GROUP BY entity_main.combo_id \
             ORDER BY {} \
-            LIMIT 50",
+            LIMIT 50 OFFSET $2",
             sort.to_sql()
         ).as_str() 
     )
     .bind(user_id)
+    .bind(page * 50)
     .fetch_all(db)
     .await?;
 

@@ -43,6 +43,7 @@ pub enum EntitySort {
     #[default]
     MostUsed,
     LeastUsed,
+    Random,
 }
 
 impl EntitySort {
@@ -54,6 +55,7 @@ impl EntitySort {
             EntitySort::FirstUsed => "entity_data.last_used ASC",
             EntitySort::MostUsed => "entity_data.count DESC",
             EntitySort::LeastUsed => "entity_data.count ASC",
+            EntitySort::Random => "RANDOM()",
         }
     }
 }

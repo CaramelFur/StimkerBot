@@ -52,12 +52,12 @@ pub async fn command_handler(
                 msg.chat.id,
                 format!(
                     "<b>General</b>\n\
-                    This bot allows you to tag your stickers, gifs, photos and videos with tags.\n\
-                    You can then search for these tags and send the sticker, gif, photo or video.\n\
+                    This bot allows you to tag your stickers, gifs, photos and videos with tags.\
+                    You can then search for these tags and send the sticker, gif, photo or video.\
                     Start a search by mentioning me in your chatbox.\n\
                     \n<b>Tagging</b>\n\
-                    You can tag your stickers, gifs, photos and videos by sending them to me.\n\
-                    I will then ask you which tags you want to add to it.\n\
+                    You can tag your stickers, gifs, photos and videos by sending them to me.\
+                    I will then ask you which tags you want to add to it.\
                     If you want to tag an enitre stickerpack, use the /pack command.\n\
                     \n<b>Filters</b>\n\
                     You can use some special filters to narrow down your search.\n\
@@ -74,6 +74,7 @@ pub async fn command_handler(
                     - <code>first_added</code> or <code>fa</code> will sort by first added\n\
                     - <code>last_used</code> or <code>nu</code> will sort by last used\n\
                     - <code>first_used</code> or <code>ou</code> will sort by first used\n\
+                    - <code>random</code> or <code>rnd</code> will sort randomly\n\
                     \n<b>Commands</b>\n\
                     {}",
                     command_help
