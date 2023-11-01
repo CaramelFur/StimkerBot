@@ -1,7 +1,11 @@
 use std::sync::Arc;
 use teloxide::net::Download;
+use teloxide::payloads::SendMessage;
 use teloxide::prelude::*;
-use teloxide::types::{FileMeta, InputFile, Me};
+use teloxide::requests::JsonRequest;
+use teloxide::types::{
+    FileMeta, InputFile, KeyboardButton, KeyboardMarkup, KeyboardRemove, Me, Recipient, ReplyMarkup,
+};
 use teloxide::utils::command::BotCommands;
 
 use crate::database::entities::EntityType;
@@ -51,7 +55,7 @@ pub async fn command_handler(
     match Command::parse(msg.text().unwrap(), me.username()) {
         Ok(Command::Help) => {
             let command_help = Command::descriptions().to_string();
-            bot.send_message(
+            bot.send_message_easy(
                 msg.chat.id,
                 format!(
                     "<b>General</b>\n\
@@ -86,7 +90,7 @@ pub async fn command_handler(
             .await?;
         }
         Ok(Command::Start) => {
-            bot.send_message(
+            bot.send_message_easy(
                 msg.chat.id,
                 "You can start using this bot by sending it a sticker, gif, photo or video.\n\
                 You can also use /help to get more information",
@@ -95,12 +99,12 @@ pub async fn command_handler(
         }
         Ok(Command::Pack) => {
             if dialogue.get().await?.unwrap() != ConversationState::ReceiveEntityId {
-                bot.send_message(msg.chat.id, "Please finish your action, or /cancel")
+                bot.send_message_easy(msg.chat.id, "Please finish your action, or /cancel")
                     .await?;
                 return Ok(());
             }
 
-            bot.send_message(
+            bot.send_message_easy(
                 msg.chat.id,
                 "Please send me a sticker from the pack you want to tag",
             )
@@ -114,17 +118,19 @@ pub async fn command_handler(
             send_bot_export(&db, &bot, &msg).await?;
         }
         Ok(Command::Import) => {
-            bot.send_message(
+            bot.send_message_buttons(
                 msg.chat.id,
                 "Ready to import, please send me the file you got from /export",
+                vec!["/cancel"],
             )
             .await?;
             dialogue.update(ConversationState::ReceiveBotImport).await?;
         }
         Ok(Command::QSImport) => {
-            bot.send_message(
+            bot.send_message_buttons(
                 msg.chat.id,
                 "Ready to import, please send me the file you got from QuickStickBot",
+                vec!["/cancel"],
             )
             .await?;
 
@@ -132,11 +138,11 @@ pub async fn command_handler(
         }
         Ok(Command::Cancel) => {
             dialogue.update(ConversationState::ReceiveEntityId).await?;
-            bot.send_message(msg.chat.id, "Cancelled").await?;
+            bot.send_message_easy(msg.chat.id, "Cancelled").await?;
         }
         Ok(Command::Stats) => {
             let stats = queries::get_global_stats(&db).await?;
-            bot.send_message(
+            bot.send_message_easy(
                 msg.chat.id,
                 format!(
                     "<b>Global stats</b>\n\
@@ -166,15 +172,17 @@ pub async fn command_handler(
             .await?;
         }
         Ok(Command::Stop) => {
-            bot.send_message(
+            bot.send_message_buttons(
                 msg.chat.id,
                 "Please send 'I WANT TO DELETE EVERYTHING' to confirm",
+                vec!["/cancel"],
             )
             .await?;
             dialogue.update(ConversationState::VerifyStop).await?;
         }
         Err(_) => {
-            bot.send_message(msg.chat.id, "Unknown command").await?;
+            bot.send_message_easy(msg.chat.id, "Unknown command")
+                .await?;
         }
     }
 
@@ -262,7 +270,7 @@ pub async fn receive_bot_import(
 }
 
 async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Exporting your stickers...")
+    bot.send_message_easy(msg.chat.id, "Exporting your stickers...")
         .await?;
 
     let user_id = msg.from().unwrap().id.to_string();
@@ -281,7 +289,7 @@ async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerRe
 async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
     // Check if message has a json attachment
     if msg.document().is_none() {
-        bot.send_message(msg.chat.id, "No file sent, operation cancelled")
+        bot.send_message_easy(msg.chat.id, "No file sent, operation cancelled")
             .await?;
         return Err("No file sent".into());
     }
@@ -289,7 +297,7 @@ async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
     let doc = msg.document().unwrap();
 
     if doc.file.size > 50_000_000 {
-        bot.send_message(msg.chat.id, "File too large, operation cancelled")
+        bot.send_message_easy(msg.chat.id, "File too large, operation cancelled")
             .await?;
         return Err("File too large".into());
     }
@@ -310,7 +318,7 @@ pub async fn verify_stop(
     dialogue.update(ConversationState::ReceiveEntityId).await?;
 
     if msg.text().is_none() || msg.text().unwrap() != "I WANT TO DELETE EVERYTHING" {
-        bot.send_message(msg.chat.id, "Stop action cancelled")
+        bot.send_message_easy(msg.chat.id, "Stop action cancelled")
             .await?;
         return Ok(());
     }
@@ -321,7 +329,7 @@ pub async fn verify_stop(
 
     queries::wipe_user(&db, user_id.clone()).await?;
 
-    bot.send_message(msg.chat.id, "All your data has been wiped")
+    bot.send_message_easy(msg.chat.id, "All your data has been wiped")
         .await?;
 
     Ok(())
@@ -334,7 +342,7 @@ pub async fn receive_entities_ids(
     msg: Message,
 ) -> HandlerResult {
     if msg.sticker().is_none() {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             "Please send me a sticker from the pack you want to tag",
         )
@@ -344,7 +352,7 @@ pub async fn receive_entities_ids(
 
     let sticker = msg.sticker().unwrap();
     if sticker.set_name.is_none() {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             "This sticker doesn't belong to a pack, please send me a sticker from a pack",
         )
@@ -363,7 +371,7 @@ pub async fn receive_entities_ids(
         .map(|sticker| sticker.file.to_owned())
         .collect();
 
-    bot.send_message(
+    bot.send_message_buttons(
         msg.chat.id,
         format!(
             "Got stickerpack <code>{}</code> with <code>{}</code> stickers.\n\
@@ -372,6 +380,7 @@ pub async fn receive_entities_ids(
             pack_name,
             entities.len()
         ),
+        vec!["/cancel"],
     )
     .await?;
 
@@ -392,7 +401,7 @@ pub async fn receive_entities_tags(
     let entity_type = EntityType::Sticker;
 
     if msg.text().is_none() {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             "Please send me a space seperated list of tags or /cancel",
         )
@@ -414,7 +423,8 @@ pub async fn receive_entities_tags(
     log::debug!("Got tags: {:?} from {:?}", tags, user_id);
 
     if tags.len() == 0 {
-        bot.send_message(msg.chat.id, "No tags provided").await?;
+        bot.send_message_easy(msg.chat.id, "No tags provided")
+            .await?;
         return Ok(());
     }
 
@@ -503,7 +513,7 @@ pub async fn receive_entity_id(
             EntityType::Photo,
         )
     } else {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             "Please send me a sticker, animation, photo or video",
         )
@@ -530,7 +540,7 @@ pub async fn receive_entity_id(
         queries::get_entity_usage(&db, user_id.clone(), entity.unique_id.clone()).await?;
 
     if current_tags.len() > 0 {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             format!(
                 "Your current tags for this are: <b>{}</b>\n\
@@ -546,12 +556,13 @@ pub async fn receive_entity_id(
         .await?;
     }
 
-    bot.send_message(
+    bot.send_message_buttons(
         msg.chat.id,
         "Which tags do you want to add to this?\n\
         - Make the first tag <code>replace</code>, to replace all tags\n\
         - Make the first tag <code>clear</code>, to remove all existing tags\n\
         - Start the tag with <code>-</code> to remove an existing tag",
+        vec!["clear", "/cancel"],
     )
     .await?;
 
@@ -573,7 +584,7 @@ pub async fn receive_entity_tags(
     (entity, entity_type): (FileMeta, EntityType),
 ) -> HandlerResult {
     if msg.text().is_none() {
-        bot.send_message(
+        bot.send_message_easy(
             msg.chat.id,
             "Please send me a space seperated list of tags or /cancel",
         )
@@ -599,7 +610,7 @@ pub async fn receive_entity_tags(
         queries::wipe_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
 
         if tags[0] == "clear" {
-            bot.send_message(msg.chat.id, "Cleared all tags for this")
+            bot.send_message_easy(msg.chat.id, "Cleared all tags for this")
                 .await?;
             dialogue.update(ConversationState::ReceiveEntityId).await?;
             return Ok(());
@@ -609,7 +620,8 @@ pub async fn receive_entity_tags(
     }
 
     if tags.len() == 0 {
-        bot.send_message(msg.chat.id, "No tags provided").await?;
+        bot.send_message_easy(msg.chat.id, "No tags provided")
+            .await?;
         return Ok(());
     }
 
@@ -654,11 +666,65 @@ pub async fn receive_entity_tags(
 
     log::debug!("New tags for user {:?} is {:?}", user_id, tags);
 
-    bot.send_message(
+    bot.send_message_easy(
         msg.chat.id,
         format!("The new tags for this are now: <b>{}</b>", tags.join(", ")),
     )
     .await?;
     dialogue.update(ConversationState::ReceiveEntityId).await?;
     Ok(())
+}
+
+trait BetterSendMessage {
+    fn send_message_buttons<C, T, S>(
+        &self,
+        chat_id: C,
+        text: T,
+        buttons: Vec<S>,
+    ) -> JsonRequest<SendMessage>
+    where
+        C: Into<Recipient>,
+        T: Into<String>,
+        S: Into<String>;
+
+    fn send_message_easy<C, T>(&self, chat_id: C, text: T) -> JsonRequest<SendMessage>
+    where
+        C: Into<Recipient>,
+        T: Into<String>,
+    {
+        self.send_message_buttons(chat_id, text, vec![] as Vec<&str>)
+    }
+}
+
+impl BetterSendMessage for BotType {
+    fn send_message_buttons<C, T, S>(
+        &self,
+        chat_id: C,
+        text: T,
+        buttons: Vec<S>,
+    ) -> JsonRequest<SendMessage>
+    where
+        C: Into<Recipient>,
+        T: Into<String>,
+        S: Into<String>,
+    {
+        let mut message = self.send_message(chat_id, text);
+
+        if buttons.is_empty() {
+            message = message.reply_markup(ReplyMarkup::KeyboardRemove(KeyboardRemove::new()));
+        } else {
+            let buttons = buttons
+                .into_iter()
+                .map(|b| KeyboardButton::new(b.into()))
+                .collect::<Vec<KeyboardButton>>();
+
+            message = message.reply_markup(ReplyMarkup::Keyboard(
+                KeyboardMarkup::new(vec![buttons])
+                    .resize_keyboard(true)
+                    .one_time_keyboard(true),
+            ));
+        }
+
+        message
+    }
 }
