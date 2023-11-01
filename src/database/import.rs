@@ -1,14 +1,15 @@
-use crate::types::{DbConn, HandlerResult};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use serde;
 use serde::{Deserialize, Serialize};
 use sqlx::QueryBuilder;
-
-use super::entities::EntityType;
 use std::collections::HashSet;
 use std::io::{Read, Write};
+
+use crate::types::{DbConn, HandlerResult};
+
+use super::entities::EntityType;
 
 type QSBotImport = Vec<QSBotImportItem>;
 

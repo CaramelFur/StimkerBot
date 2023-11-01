@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use teloxide::payloads;
 use teloxide::prelude::*;
-
 use teloxide::types::*;
 
 use crate::database::entities::EntityType;

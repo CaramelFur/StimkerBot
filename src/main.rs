@@ -1,17 +1,16 @@
 use dotenv::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
-use teloxide::utils::command::BotCommands;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
+use teloxide::utils::command::BotCommands;
+use types::*;
 
 mod database;
 mod inline;
 mod messages;
 mod types;
 mod util;
-
-use types::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -81,7 +80,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::debug!("Sending commands");
 
-    bot.set_my_commands(messages::Command::bot_commands()).await?;
+    bot.set_my_commands(messages::Command::bot_commands())
+        .await?;
 
     log::debug!("Starting dispatcher");
 

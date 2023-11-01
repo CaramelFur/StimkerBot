@@ -74,11 +74,10 @@ pub async fn insert_tags(
 
     for entity in entities {
         // Insert a relation between the entity and the tag
-        let mut insert_main_query: QueryBuilder<'_, Sqlite> =
-            QueryBuilder::new(
-                "INSERT OR IGNORE INTO entity_main (combo_id, tag_id) \
+        let mut insert_main_query: QueryBuilder<'_, Sqlite> = QueryBuilder::new(
+            "INSERT OR IGNORE INTO entity_main (combo_id, tag_id) \
                 SELECT (SELECT combo_id FROM entity_data WHERE entity_id = ",
-            );
+        );
         insert_main_query.push_bind(&entity.entity_id);
         insert_main_query.push(" AND user_id = ");
         insert_main_query.push_bind(&user_id);
@@ -287,12 +286,12 @@ async fn list_entities(
             ORDER BY {} \
             LIMIT 50 OFFSET $2",
             sort.to_sql()
-        ).as_str() 
+        ).as_str()
     )
-    .bind(user_id)
-    .bind(page * 50)
-    .fetch_all(db)
-    .await?;
+        .bind(user_id)
+        .bind(page * 50)
+        .fetch_all(db)
+        .await?;
 
     log::debug!("list_entities result: {:?}", result);
 
@@ -317,11 +316,11 @@ pub async fn increase_entity_stat(
         VALUES ($1, $2, 1, $3) \
         ON CONFLICT (user_id, entity_id) DO UPDATE SET count = entity_data.count + 1, last_used = $3"
     )
-    .bind(user_id.clone())
-    .bind(unique_entity_id.clone())
-    .bind(util::get_unix())
-    .execute(db)
-    .await?;
+        .bind(user_id.clone())
+        .bind(unique_entity_id.clone())
+        .bind(util::get_unix())
+        .execute(db)
+        .await?;
 
     log::debug!(
         "increase_entity_stat for user_id: {:?} and unique_entity_id: {:?} done",
@@ -373,7 +372,7 @@ pub async fn get_entity_usage(
 pub struct GlobalStats {
     pub total_users: i64,
     pub total_tags: i64,
-    
+
     pub total_stickers: i64,
     pub total_animations: i64,
     pub total_videos: i64,
@@ -389,21 +388,21 @@ pub async fn get_global_stats(db: &DbConn) -> Result<GlobalStats, Error> {
         .fetch_one(db)
         .await?;
 
-        // count rows in entity_file
-    let (total_stickers, total_animations, total_videos, total_photos): (i64, i64, i64, i64) = sqlx::query_as(
-        "SELECT \
+    // count rows in entity_file
+    let (total_stickers, total_animations, total_videos, total_photos): (i64, i64, i64, i64) =
+        sqlx::query_as(
+            "SELECT \
         (SELECT COUNT(*) FROM entity_file WHERE entity_type = $1) AS total_stickers, \
         (SELECT COUNT(*) FROM entity_file WHERE entity_type = $2) AS total_animations, \
         (SELECT COUNT(*) FROM entity_file WHERE entity_type = $3) AS total_videos, \
-        (SELECT COUNT(*) FROM entity_file WHERE entity_type = $4) AS total_photos"
-    )
-    .bind(EntityType::Sticker)
-    .bind(EntityType::Animation)
-    .bind(EntityType::Video)
-    .bind(EntityType::Photo)
-    .fetch_one(db)
-    .await?;
-
+        (SELECT COUNT(*) FROM entity_file WHERE entity_type = $4) AS total_photos",
+        )
+        .bind(EntityType::Sticker)
+        .bind(EntityType::Animation)
+        .bind(EntityType::Video)
+        .bind(EntityType::Photo)
+        .fetch_one(db)
+        .await?;
 
     let total_tags: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM entity_tag")
         .fetch_one(db)
