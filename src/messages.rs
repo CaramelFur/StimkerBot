@@ -22,6 +22,9 @@ pub enum Command {
     #[command(description = "Add or remove tags to an entire stickerpack")]
     Pack,
 
+    #[command(description = "Stop whatever you are doing")]
+    Cancel,
+
     #[command(description = "Export your data")]
     Export,
 
@@ -31,8 +34,8 @@ pub enum Command {
     #[command(description = "Import your data from a QuickStickBot export")]
     QSImport,
 
-    #[command(description = "Stop whatever you are doing")]
-    Cancel,
+    #[command(description = "Shows global statistics about this bot")]
+    Stats,
 
     #[command(description = "DANGEROUS! Wipes your data")]
     Stop,
@@ -130,6 +133,37 @@ pub async fn command_handler(
         Ok(Command::Cancel) => {
             dialogue.update(ConversationState::ReceiveEntityId).await?;
             bot.send_message(msg.chat.id, "Cancelled").await?;
+        }
+        Ok(Command::Stats) => {
+            let stats = queries::get_global_stats(&db).await?;
+            bot.send_message(
+                msg.chat.id,
+                format!(
+                    "<b>Global stats</b>\n\
+                    Users: <code>{}</code>\n\
+                    Tags: <code>{}</code>\n\
+                    Sent: <code>{}</code>\n\
+                    \n\
+                    <b>Entity count</b>\n\
+                    <i>Total</i>: <code>{}</code>\n\
+                    Stickers: <code>{}</code>\n\
+                    Animations: <code>{}</code>\n\
+                    Photos: <code>{}</code>\n\
+                    Videos: <code>{}</code>",
+                    stats.total_users,
+                    stats.total_tags,
+                    stats.total_entities_sent,
+                    stats.total_stickers
+                        + stats.total_animations
+                        + stats.total_photos
+                        + stats.total_videos,
+                    stats.total_stickers,
+                    stats.total_animations,
+                    stats.total_photos,
+                    stats.total_videos,
+                ),
+            )
+            .await?;
         }
         Ok(Command::Stop) => {
             bot.send_message(
