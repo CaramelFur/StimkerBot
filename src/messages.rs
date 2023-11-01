@@ -41,6 +41,9 @@ pub enum Command {
     #[command(description = "Shows global statistics about this bot")]
     Stats,
 
+    #[command(description = "Shows information about this bot")]
+    About,
+
     #[command(description = "DANGEROUS! Wipes your data")]
     Stop,
 }
@@ -167,6 +170,18 @@ pub async fn command_handler(
                     stats.total_animations,
                     stats.total_photos,
                     stats.total_videos,
+                ),
+            )
+            .await?;
+        }
+        Ok(Command::About) => {
+            bot.send_message_easy(
+                msg.chat.id,
+                format!(
+                    "<b>Stimkerbot V{}</b>\n\
+                    This bot is made by @CaramelFluff (<a href=\"https://caramelfur.dev/\">caramelfur.dev</a>)\n\
+                    The source code is available on <a href=\"https://github.com/CaramelFur/StimkerBot\">GitHub</a>",
+                    env!("CARGO_PKG_VERSION")
                 ),
             )
             .await?;
