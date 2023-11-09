@@ -62,14 +62,17 @@ pub async fn command_handler(
                 msg.chat.id,
                 format!(
                     "<b>General</b>\n\
-                    This bot allows you to tag your stickers, gifs, photos and videos with tags.\
-                    You can then search for these tags and send the sticker, gif, photo or video.\
+                    This bot allows you to tag your stickers, gifs, photos and videos with tags. \
+                    You can then search for these tags and send the sticker, gif, photo or video. \
                     Start a search by mentioning me in your chatbox.\n\
                     \n<b>Tagging</b>\n\
-                    You can tag your stickers, gifs, photos and videos by sending them to me.\
-                    I will then ask you which tags you want to add to it.\
+                    You can tag your stickers, gifs, photos and videos by sending them to me. \
+                    I will then ask you which tags you want to add to it. \
                     If you want to tag an enitre stickerpack, use the /pack command.\n\
                     \n<b>Filters</b>\n\
+                    You can filter your search by typing in a tag, or multiple tags. \
+                    Tags are searched for with autocomplete, so you don't have to type the full tag. \
+                    You can negate tags  by appending <code>-</code> to a tag. \
                     You can use some special filters to narrow down your search.\n\
                     - <code>all</code> will show all your stickers, gifs, photos and videos\n\
                     - <code>sticker</code> or <code>stk</code> will only show stickers\n\

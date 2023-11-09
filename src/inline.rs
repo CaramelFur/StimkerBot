@@ -132,7 +132,9 @@ fn parse_search(input: &String) -> InlineSearchQuery {
 
     for tag in tags_all {
         if tag.starts_with("-") {
-            tags_negative.push(tag[1..].to_owned());
+            if tag.len() > 1 {
+                tags_negative.push(tag[1..].to_owned());
+            }
         } else {
             tags_positive.push(tag);
         }

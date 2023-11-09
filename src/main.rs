@@ -1,5 +1,5 @@
 use dotenv::dotenv;
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
@@ -107,7 +107,10 @@ async fn get_db() -> Result<DbType, Box<dyn std::error::Error>> {
     touch(database_location.clone());
     let db: DbType = Arc::new(
         SqlitePoolOptions::new()
-            .connect(&format!("sqlite://{}", database_location))
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(database_location)
+            )
             .await
             .unwrap(),
     );
