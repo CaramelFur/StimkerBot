@@ -63,6 +63,7 @@ impl EntitySort {
 #[derive(Clone, PartialEq, Default)]
 pub struct InlineSearchQuery {
     pub tags: Vec<String>,
+    pub negative_tags: Vec<String>,
     pub sort: EntitySort,
     pub entity_type: Option<EntityType>,
     pub get_all: bool,

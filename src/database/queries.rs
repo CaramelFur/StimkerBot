@@ -248,11 +248,38 @@ pub async fn find_entities(
     );
     query_builder.push(" WHERE entity_data.user_id = ");
     query_builder.push_bind(user_id);
-    query_builder.push(" AND entity_tag.tag_name IN (");
-    query_builder.push_values(query.tags.into_iter(), |mut b, tag_name| {
-        b.push_bind(tag_name);
+    query_builder.push(" AND (");
+    let mut seperator_builder = query_builder.separated("OR");
+    query.tags.into_iter().for_each(|tag_name| {
+        let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
+        let needs_escape = escaped_tag != tag_name;
+        escaped_tag += "%";
+
+        seperator_builder.push(" entity_tag.tag_name LIKE ");
+        seperator_builder.push_bind_unseparated(escaped_tag);
+
+        if needs_escape {
+            seperator_builder.push_unseparated(" ESCAPE '\\' ");
+        }
     });
     query_builder.push(")");
+    // if query.negative_tags.len() > 0 {
+    //     query_builder.push(" AND NOT (");
+    //     let mut seperator_builder = query_builder.separated("AND");
+    //     query.negative_tags.into_iter().for_each(|tag_name| {
+    //         let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
+    //         let needs_escape = escaped_tag != tag_name;
+    //         escaped_tag += "%";
+
+    //         seperator_builder.push(" entity_tag.tag_name LIKE ");
+    //         seperator_builder.push_bind_unseparated(escaped_tag);
+
+    //         if needs_escape {
+    //             seperator_builder.push_unseparated(" ESCAPE '\\' ");
+    //         }
+    //     });
+    //     query_builder.push(")");
+    // }
     query_builder.push(" GROUP BY entity_main.combo_id"); // Since we filter by user, this is possible
     query_builder.push(" HAVING COUNT(entity_tag.tag_name) >= ");
     query_builder.push_bind(tags_len);

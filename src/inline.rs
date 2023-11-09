@@ -68,7 +68,7 @@ pub async fn handler_inline_query(
 fn parse_search(input: &String) -> InlineSearchQuery {
     let mut query = InlineSearchQuery::default();
 
-    let tags: Vec<String> = input
+    let tags_all: Vec<String> = input
         .to_lowercase()
         .replace(",", " ")
         .split(" ")
@@ -127,7 +127,19 @@ fn parse_search(input: &String) -> InlineSearchQuery {
         })
         .collect();
 
-    query.tags = tags;
+    let mut tags_positive = Vec::new();
+    let mut tags_negative = Vec::new();
+
+    for tag in tags_all {
+        if tag.starts_with("-") {
+            tags_negative.push(tag[1..].to_owned());
+        } else {
+            tags_positive.push(tag);
+        }
+    }
+
+    query.tags = tags_positive;
+    query.negative_tags = tags_negative;
 
     query
 }
