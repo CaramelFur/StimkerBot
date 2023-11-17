@@ -35,7 +35,7 @@ pub enum Command {
     #[command(description = "Import your data")]
     Import,
 
-    #[command(description = "Import your data from a QuickStickBot export")]
+    #[command(description = "Import your data from a QuickStickBot or QuickGifBot export")]
     QSImport,
 
     #[command(description = "Shows global statistics about this bot")]
@@ -220,23 +220,21 @@ pub async fn receive_qs_import(
     let user_id = msg.from().unwrap().id.to_string();
 
     let change_message = bot
-        .send_message(msg.chat.id, format!("Importing your stickers..."))
+        .send_message_easy(msg.chat.id, format!("Importing your stickers..."))
         .await?;
 
-    let result = database::import::import_qsbot(&db, user_id, file_data).await;
+    let result = database::import::import_qsbot(&db,  user_id, file_data).await;
     match result {
         Ok(_) => {
-            bot.edit_message_text(
-                change_message.chat.id,
-                change_message.id,
+            bot.send_message_easy(
+                msg.chat.id,
                 format!("Imported your stickers!"),
             )
             .await?;
         }
         Err(e) => {
-            bot.edit_message_text(
-                change_message.chat.id,
-                change_message.id,
+            bot.send_message_easy(
+                msg.chat.id,
                 format!("Failed to import your stickers"),
             )
             .await?;
@@ -260,23 +258,21 @@ pub async fn receive_bot_import(
     let user_id = msg.from().unwrap().id.to_string();
 
     let change_message = bot
-        .send_message(msg.chat.id, format!("Importing your stickers..."))
+        .send_message_easy(msg.chat.id, format!("Importing your stickers..."))
         .await?;
 
     let result = database::import::import_json(&db, user_id, file_data).await;
     match result {
         Ok(_) => {
-            bot.edit_message_text(
-                change_message.chat.id,
-                change_message.id,
+            bot.send_message_easy(
+                msg.chat.id,
                 format!("Imported your stickers!"),
             )
             .await?;
         }
         Err(e) => {
-            bot.edit_message_text(
-                change_message.chat.id,
-                change_message.id,
+            bot.send_message_easy(
+                msg.chat.id,
                 format!("Failed to import your stickers"),
             )
             .await?;
@@ -463,7 +459,7 @@ pub async fn receive_entities_tags(
     log::debug!("Adding tags: {:?}", add_tags);
 
     let processing_message = bot
-        .send_message(
+        .send_message_easy(
             msg.chat.id,
             format!("Processing <code>{}</code> stickers...", entities.len()),
         )
@@ -494,9 +490,8 @@ pub async fn receive_entities_tags(
     )
     .await?;
 
-    bot.edit_message_text(
-        processing_message.chat.id,
-        processing_message.id,
+    bot.send_message_easy(
+        msg.chat.id,
         format!(
             "Success!\n\
             Added tags: <b>{}</b>\n\

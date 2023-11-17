@@ -1,3 +1,4 @@
+use crate::types::{DbConn, HandlerResult};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -7,9 +8,7 @@ use sqlx::QueryBuilder;
 use std::collections::HashSet;
 use std::io::{Read, Write};
 
-use crate::types::{DbConn, HandlerResult};
-
-use super::entities::EntityType;
+use super::entities::{Entity, EntityType};
 
 type QSBotImport = Vec<QSBotImportItem>;
 
@@ -20,9 +19,9 @@ struct QSBotImportItem {
     file_id: String,
     tags: Vec<String>,
     #[serde(rename = "set")]
-    _set: String,
+    _set: Option<String>,
     #[serde(rename = "isAnimated")]
-    _is_animated: bool,
+    _is_animated: Option<bool>,
 }
 
 pub async fn import_qsbot(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
@@ -30,18 +29,21 @@ pub async fn import_qsbot(db: &DbConn, user_id: String, file: Vec<u8>) -> Handle
     let qs_import: QSBotImport = serde_json::from_slice(&file)?;
 
     // Insert the file into the database
-    let bot_import: BotImport = qs_import
-        .into_iter()
-        .map(|item| ImportItem {
+    let mut bot_import: BotImport = Vec::new();
+
+    for item in qs_import {
+        let entity_type = Entity::file_id_to_type(&item.file_id)?;
+
+        bot_import.push(ImportItem {
             entity_id: item.id,
             file_id: item.file_id,
-            entity_type: EntityType::Sticker,
+            entity_type: entity_type,
             tags: item.tags,
             count: 0,
             last_used: 0,
             created_at: 0,
-        })
-        .collect();
+        });
+    }
 
     import_botimport(db, user_id, bot_import).await?;
 

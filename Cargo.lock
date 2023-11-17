@@ -1927,8 +1927,9 @@ dependencies = [
 
 [[package]]
 name = "sticker_bot"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
+ "base64",
  "dotenv",
  "flate2",
  "log",

@@ -6,8 +6,8 @@ use crate::util;
 
 #[derive(Debug, Default, Clone)]
 pub struct InsertEntity {
-    pub entity_id: String,
-    pub file_id: String,
+    pub entity_id: String, // unique_id
+    pub file_id: String, // id
 }
 
 pub async fn insert_tags(
