@@ -38,11 +38,7 @@ impl Entity {
         let rle_decoded = rle_decode(&file_id_decoded);
         let mut type_num: u32 = u32::from_le_bytes(rle_decoded[0..4].try_into()?);
 
-        println!("Type num binary: {:b}", type_num);
-
         type_num &= !(1 << 24 | 1 << 25);
-
-        println!("Type num: {}", type_num);
 
         match type_num {
             2 => Ok(EntityType::Photo),

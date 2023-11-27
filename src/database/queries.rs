@@ -7,7 +7,7 @@ use crate::util;
 #[derive(Debug, Default, Clone)]
 pub struct InsertEntity {
     pub entity_id: String, // unique_id
-    pub file_id: String, // id
+    pub file_id: String,   // id
 }
 
 pub async fn insert_tags(
@@ -165,6 +165,48 @@ pub async fn wipe_tags(db: &DbConn, user_id: String, entity_id: String) -> Resul
     Ok(())
 }
 
+pub async fn get_last_fix_time(db: &DbConn, user_id: String) -> Result<i64, Error> {
+    log::debug!("get_last_fix_time for user_id: {:?}", user_id);
+
+    let result: Option<i64> = sqlx::query_scalar(
+        "SELECT last_fixed_time FROM user_data \
+        WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await?;
+
+    log::debug!("get_last_fix_time result: {:?}", result);
+
+    Ok(result.unwrap_or(0))
+}
+
+pub async fn set_last_fix_time(db: &DbConn, user_id: String, time: i64) -> Result<(), Error> {
+    log::debug!(
+        "set_last_fix_time for user_id: {:?} and time: {:?}",
+        user_id,
+        time
+    );
+
+    sqlx::query(
+        "INSERT INTO user_data (user_id, last_fixed_time) \
+        VALUES ($1, $2) \
+        ON CONFLICT (user_id) DO UPDATE SET last_fixed_time = $2",
+    )
+    .bind(user_id.to_owned())
+    .bind(time)
+    .execute(db)
+    .await?;
+
+    log::debug!(
+        "set_last_fix_time for user_id: {:?} and time: {:?} done",
+        user_id,
+        time
+    );
+
+    Ok(())
+}
+
 pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
     log::debug!("wipe_user for user_id: {:?}", user_id);
 
@@ -181,6 +223,14 @@ pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
 
     sqlx::query(
         "DELETE FROM entity_data \
+        WHERE user_id = $1",
+    )
+    .bind(user_id.clone())
+    .execute(transaction.as_mut())
+    .await?;
+
+    sqlx::query(
+        "DELETE FROM user_data \
         WHERE user_id = $1",
     )
     .bind(user_id.clone())
@@ -265,10 +315,10 @@ pub async fn find_entities(
             let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
             let needs_escape = escaped_tag != tag_name;
             escaped_tag += "%";
-    
+
             seperator_builder.push(" entity_tag.tag_name LIKE ");
             seperator_builder.push_bind_unseparated(escaped_tag);
-    
+
             if needs_escape {
                 seperator_builder.push_unseparated(" ESCAPE '\\' ");
             }

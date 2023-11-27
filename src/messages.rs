@@ -11,7 +11,7 @@ use teloxide::utils::command::BotCommands;
 use crate::database::entities::EntityType;
 use crate::database::import;
 use crate::database::queries::{self, InsertEntity};
-use crate::util::unix_to_humantime;
+use crate::util::{get_unix, unix_to_humantime};
 use crate::{database, types::*};
 
 #[derive(BotCommands)]
@@ -37,6 +37,9 @@ pub enum Command {
 
     #[command(description = "Import your data from a QuickStickBot or QuickGifBot export")]
     QSImport,
+
+    #[command(description = "If stickerbot is not longer working, try this. (This is a slow operation, use sparingly)")]
+    FixEntities,
 
     #[command(description = "Shows global statistics about this bot")]
     Stats,
@@ -142,6 +145,9 @@ pub async fn command_handler(
 
             dialogue.update(ConversationState::ReceiveQSImport).await?;
         }
+        Ok(Command::FixEntities) => {
+            fix_bot_entities(&db, &bot, &msg).await?;
+        }
         Ok(Command::Cancel) => {
             dialogue.update(ConversationState::ReceiveEntityId).await?;
             bot.send_message_easy(msg.chat.id, "Cancelled").await?;
@@ -219,19 +225,19 @@ pub async fn receive_qs_import(
 
     let user_id = msg.from().unwrap().id.to_string();
 
-    bot.send_message_easy(msg.chat.id, format!("Importing your stickers..."))
+    bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
 
     let result = database::import::import_qsbot(&db, user_id, file_data).await;
     match result {
         Ok(_) => {
-            bot.send_message_easy(msg.chat.id, format!("Imported your stickers!"))
+            bot.send_message_easy(msg.chat.id, format!("Imported your entities!"))
                 .await?;
         }
         Err(e) => {
-            bot.send_message_easy(msg.chat.id, format!("Failed to import your stickers"))
+            bot.send_message_easy(msg.chat.id, format!("Failed to import your entities"))
                 .await?;
-            log::error!("Failed to import stickers: {:?}", e);
+            log::error!("Failed to import entities: {:?}", e);
         }
     };
 
@@ -250,19 +256,19 @@ pub async fn receive_bot_import(
 
     let user_id = msg.from().unwrap().id.to_string();
 
-    bot.send_message_easy(msg.chat.id, format!("Importing your stickers..."))
+    bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
 
     let result = database::import::import_json(&db, user_id, file_data).await;
     match result {
         Ok(_) => {
-            bot.send_message_easy(msg.chat.id, format!("Imported your stickers!"))
+            bot.send_message_easy(msg.chat.id, format!("Imported your entities!"))
                 .await?;
         }
         Err(e) => {
-            bot.send_message_easy(msg.chat.id, format!("Failed to import your stickers"))
+            bot.send_message_easy(msg.chat.id, format!("Failed to import your entities"))
                 .await?;
-            log::error!("Failed to import stickers: {:?}", e);
+            log::error!("Failed to import entities: {:?}", e);
         }
     };
 
@@ -270,7 +276,7 @@ pub async fn receive_bot_import(
 }
 
 async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
-    bot.send_message_easy(msg.chat.id, "Exporting your stickers...")
+    bot.send_message_easy(msg.chat.id, "Exporting your entities...")
         .await?;
 
     let user_id = msg.from().unwrap().id.to_string();
@@ -307,6 +313,42 @@ async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
     bot.download_file(&doc_data.path, &mut file_data).await?;
 
     Ok(file_data)
+}
+
+async fn fix_bot_entities(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
+    let user_id = msg.from().unwrap().id.to_string();
+
+    let last_fixed_time = queries::get_last_fix_time(db, user_id.clone()).await?;
+
+    if last_fixed_time > get_unix() - 600_000 {
+        bot.send_message_easy(
+            msg.chat.id,
+            "You've already fixed your entities within the last 10 minutes, please wait a bit before trying again."
+        )
+        .await?;
+        return Ok(());
+    }
+
+    bot.send_message_easy(msg.chat.id, "Fixing your entities...")
+        .await?;
+
+    let progress_message = bot.send_message(msg.chat.id, "Starting...").await?;
+
+    let result = import::fix_entities(db, &bot, &progress_message, user_id.to_owned()).await;
+
+    if let Err(e) = result {
+        bot.send_message_easy(msg.chat.id, format!("Failed to fix your entities"))
+            .await?;
+        log::error!("Failed to fix entities: {:?}", e);
+        return Ok(());
+    } else if let Ok(result) = result {
+        queries::set_last_fix_time(db, user_id.to_owned(), get_unix()).await?;
+
+        bot.send_message_easy(msg.chat.id, format!("Fixed {} entities!", result))
+            .await?;
+    }
+
+    Ok(())
 }
 
 pub async fn verify_stop(
