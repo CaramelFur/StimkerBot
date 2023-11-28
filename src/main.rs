@@ -8,9 +8,8 @@ use types::*;
 
 mod database;
 mod handlers;
-mod messages;
-mod types;
 mod util;
+mod types;
 
 use handlers::inline;
 
@@ -27,32 +26,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let command_handler =
         dptree::filter(|msg: Message| msg.text().map(|t| t.starts_with("/")).unwrap_or(false))
-            .endpoint(messages::command_handler);
+            .endpoint(handlers::command::receive_command);
 
     let message_recieve_qsimport_tree =
-        dptree::case![ConversationState::ReceiveQSImport].endpoint(messages::receive_qs_import);
+        dptree::case![ConversationState::ReceiveQSImport].endpoint(handlers::import::receive_qs_import);
 
     let message_recieve_botimport_tree =
-        dptree::case![ConversationState::ReceiveBotImport].endpoint(messages::receive_bot_import);
+        dptree::case![ConversationState::ReceiveBotImport].endpoint(handlers::import::receive_bot_import);
 
     let message_verify_stop_tree =
-        dptree::case![ConversationState::VerifyStop].endpoint(messages::verify_stop);
+        dptree::case![ConversationState::VerifyStop].endpoint(handlers::stop::verify_stop);
 
     let message_receive_entities_ids_tree = dptree::case![ConversationState::RecieveEntitiesId]
-        .endpoint(messages::receive_entities_ids);
+        .endpoint(handlers::tags::receive_entities_ids);
 
     let message_receive_entities_tags_tree =
         dptree::case![ConversationState::RecieveEntitiesTags { entities }]
-            .endpoint(messages::receive_entities_tags);
+            .endpoint(handlers::tags::receive_entities_tags);
 
     let message_receive_entity_id_tree =
-        dptree::case![ConversationState::ReceiveEntityId].endpoint(messages::receive_entity_id);
+        dptree::case![ConversationState::ReceiveEntityId].endpoint(handlers::tags::receive_entity_id);
 
     let message_receive_entity_tags_tree = dptree::case![ConversationState::ReceiveEntityTags {
         entity,
         entity_type
     }]
-    .endpoint(messages::receive_entity_tags);
+    .endpoint(handlers::tags::receive_entity_tags);
 
     let message_tree = Update::filter_message()
         .enter_dialogue::<Message, InMemStorage<ConversationState>, ConversationState>()
@@ -82,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::debug!("Sending commands");
 
-    bot.set_my_commands(messages::Command::bot_commands())
+    bot.set_my_commands(handlers::command::Command::bot_commands())
         .await?;
 
     log::debug!("Starting dispatcher");
