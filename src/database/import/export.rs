@@ -1,13 +1,14 @@
 use std::io::Write;
 
+use anyhow::Result;
 use flate2::{write::GzEncoder, Compression};
 
 use crate::{
     database::import::types::{BotImport, ExportItem, ImportItem},
-    types::{DbConn, HandlerResult},
+    types::DbConn,
 };
 
-pub async fn export(db: &DbConn, user_id: String) -> HandlerResult<Vec<u8>> {
+pub async fn export(db: &DbConn, user_id: String) -> Result<Vec<u8>> {
     log::debug!("Exporting for user {}", user_id);
 
     let results: Vec<ExportItem> = sqlx::query_as(

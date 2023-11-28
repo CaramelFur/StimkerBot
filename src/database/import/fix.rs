@@ -1,13 +1,14 @@
+use anyhow::Result;
 use teloxide::{types::Message, requests::Requester, ApiError, RequestError};
 
-use crate::{types::{DbConn, BotType, HandlerResult, InlineSearchQuery, EntitySort}, database::queries::find_entities};
+use crate::{types::{DbConn, BotType, InlineSearchQuery, EntitySort}, database::queries::find_entities};
 
 pub async fn fix(
   db: &DbConn,
   bot: &BotType,
   progress_message: &Message,
   user_id: String,
-) -> HandlerResult<i32> {
+) -> Result<i32> {
   let mut i: i32 = 0;
   let mut file_ids_to_remove: Vec<String> = Vec::new();
   loop {
@@ -62,7 +63,7 @@ pub async fn fix(
   Ok(fixed)
 }
 
-async fn remove_file_id(db: &DbConn, file_id: String) -> HandlerResult {
+async fn remove_file_id(db: &DbConn, file_id: String) -> Result<()> {
   // Remove the enitity_data with the file_id, and all tables referencing its combo_id
 
   let mut transaction = db.begin().await?;

@@ -1,8 +1,7 @@
+use anyhow::{bail, Result};
 use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use teloxide::types::*;
-
-use crate::types::HandlerResult;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(rename_all = "lowercase")]
@@ -31,7 +30,7 @@ pub struct EntityStat {
 }
 
 impl Entity {
-    pub fn file_id_to_type<T: Into<String>>(file_id: T) -> HandlerResult<EntityType> {
+    pub fn file_id_to_type<T: Into<String>>(file_id: T) -> Result<EntityType> {
         let file_id: String = file_id.into();
         // decode base64
         let file_id_decoded = general_purpose::URL_SAFE_NO_PAD.decode(file_id.as_bytes())?;
@@ -45,7 +44,7 @@ impl Entity {
             4 => Ok(EntityType::Video),
             8 => Ok(EntityType::Sticker),
             10 => Ok(EntityType::Animation),
-            _ => Err("Unknown file type".into()),
+            _ => bail!(format!("Unknown type: {}", type_num)),
         }
     }
 

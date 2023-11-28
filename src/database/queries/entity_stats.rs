@@ -1,12 +1,11 @@
-use sqlx::Error;
-
+use anyhow::Result;
 use crate::{types::DbConn, database::EntityStat, util};
 
 pub async fn increase_entity_stat(
   db: &DbConn,
   user_id: String,
   unique_entity_id: String,
-) -> Result<(), Error> {
+) -> Result<()> {
   log::debug!(
       "increase_entity_stat for user_id: {:?} and unique_entity_id: {:?}",
       user_id,
@@ -37,7 +36,7 @@ pub async fn get_entity_usage(
   db: &DbConn,
   user_id: String,
   unique_entity_id: String,
-) -> Result<EntityStat, Error> {
+) -> Result<EntityStat> {
   log::debug!(
       "get_entity_usage for user_id: {:?} and unique_entity_id: {:?}",
       user_id,

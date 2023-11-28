@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use teloxide::{macros::BotCommands, types::{Me, Message}, utils::command::BotCommands as _};
 
-use crate::{types::{DbConn, BotType, DialogueWithState, HandlerResult, ConversationState}, database::queries};
+use crate::{types::{DbConn, BotType, DialogueWithState, ConversationState}, database::queries};
 use super::{send_message::BetterSendMessage, import::send_fix_entities};
 use super::import::send_bot_export;
 
@@ -49,7 +50,7 @@ pub async fn receive_command(
     me: Me,
     dialogue: DialogueWithState,
     msg: Message,
-) -> HandlerResult {
+) -> Result<()> {
     match Command::parse(msg.text().unwrap(), me.username()) {
         Ok(Command::Help) => {
             let command_help = Command::descriptions().to_string();

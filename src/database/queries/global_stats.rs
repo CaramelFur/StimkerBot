@@ -1,8 +1,8 @@
-use sqlx::Error;
+use anyhow::Result;
 
 use crate::{database::{EntityType, queries::GlobalStats}, types::DbConn};
 
-pub async fn get_global_stats(db: &DbConn) -> Result<GlobalStats, Error> {
+pub async fn get_global_stats(db: &DbConn) -> Result<GlobalStats> {
   log::debug!("get_global_stats");
 
   let total_users: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT user_id) FROM entity_data")

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use anyhow::Result;
 use teloxide::prelude::*;
 use teloxide::types::FileMeta;
 
@@ -13,7 +14,7 @@ pub async fn receive_entities_ids(
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
-) -> HandlerResult {
+) -> Result<()> {
     if msg.sticker().is_none() {
         bot.send_message_easy(
             msg.chat.id,
@@ -70,7 +71,7 @@ pub async fn receive_entities_tags(
     dialogue: DialogueWithState,
     msg: Message,
     entities: Vec<FileMeta>,
-) -> HandlerResult {
+) -> Result<()> {
     let entity_type = EntityType::Sticker;
 
     if msg.text().is_none() {
@@ -168,7 +169,7 @@ pub async fn receive_entity_id(
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
-) -> HandlerResult {
+) -> Result<()> {
     let (entity, entity_type) = if msg.sticker().is_some() {
         (msg.sticker().unwrap().file.to_owned(), EntityType::Sticker)
     } else if msg.animation().is_some() {
@@ -253,7 +254,7 @@ pub async fn receive_entity_tags(
     dialogue: DialogueWithState,
     msg: Message,
     (entity, entity_type): (FileMeta, EntityType),
-) -> HandlerResult {
+) -> Result<()> {
     if msg.text().is_none() {
         bot.send_message_easy(
             msg.chat.id,

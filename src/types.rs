@@ -7,7 +7,6 @@ use teloxide::{
 
 use crate::database::EntityType;
 
-pub type HandlerResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub type DialogueWithState = Dialogue<ConversationState, InMemStorage<ConversationState>>;
 
 pub type BotType = DefaultParseMode<Bot>;

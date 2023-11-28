@@ -1,7 +1,8 @@
-use sqlx::Error;
+use anyhow::Result;
+
 use crate::types::DbConn;
 
-pub async fn get_last_fix_time(db: &DbConn, user_id: String) -> Result<i64, Error> {
+pub async fn get_last_fix_time(db: &DbConn, user_id: String) -> Result<i64> {
   log::debug!("get_last_fix_time for user_id: {:?}", user_id);
 
   let result: Option<i64> = sqlx::query_scalar(
@@ -17,7 +18,7 @@ pub async fn get_last_fix_time(db: &DbConn, user_id: String) -> Result<i64, Erro
   Ok(result.unwrap_or(0))
 }
 
-pub async fn set_last_fix_time(db: &DbConn, user_id: String, time: i64) -> Result<(), Error> {
+pub async fn set_last_fix_time(db: &DbConn, user_id: String, time: i64) -> Result<()> {
   log::debug!(
       "set_last_fix_time for user_id: {:?} and time: {:?}",
       user_id,
@@ -43,7 +44,7 @@ pub async fn set_last_fix_time(db: &DbConn, user_id: String, time: i64) -> Resul
   Ok(())
 }
 
-pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<(), Error> {
+pub async fn wipe_user(db: &DbConn, user_id: String) -> Result<()> {
   log::debug!("wipe_user for user_id: {:?}", user_id);
 
   let mut transaction = db.begin().await?;

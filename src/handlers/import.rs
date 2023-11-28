@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::{Result, bail};
 use teloxide::{
     net::Download,
     requests::Requester,
@@ -8,7 +9,7 @@ use teloxide::{
 
 use crate::{
     database::{import, queries},
-    types::{BotType, ConversationState, DbConn, DialogueWithState, HandlerResult}, util::get_unix,
+    types::{BotType, ConversationState, DbConn, DialogueWithState}, util::get_unix,
 };
 
 use super::send_message::BetterSendMessage;
@@ -18,7 +19,7 @@ pub async fn receive_qs_import(
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
-) -> HandlerResult {
+) -> Result<()> {
     dialogue.update(ConversationState::ReceiveEntityId).await?;
 
     let file_data = extract_file(&bot, &msg).await?;
@@ -49,7 +50,7 @@ pub async fn receive_bot_import(
     bot: BotType,
     dialogue: DialogueWithState,
     msg: Message,
-) -> HandlerResult {
+) -> Result<()> {
     dialogue.update(ConversationState::ReceiveEntityId).await?;
 
     let file_data = extract_file(&bot, &msg).await?;
@@ -75,7 +76,7 @@ pub async fn receive_bot_import(
     Ok(())
 }
 
-pub async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
+pub async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> Result<()> {
     bot.send_message_easy(msg.chat.id, "Exporting your entities...")
         .await?;
 
@@ -92,7 +93,7 @@ pub async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> Handl
     Ok(())
 }
 
-pub async fn send_fix_entities(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerResult {
+pub async fn send_fix_entities(db: &DbConn, bot: &BotType, msg: &Message) -> Result<()> {
   let user_id = msg.from().unwrap().id.to_string();
 
   let last_fixed_time = queries::get_last_fix_time(db, user_id.clone()).await?;
@@ -130,12 +131,12 @@ pub async fn send_fix_entities(db: &DbConn, bot: &BotType, msg: &Message) -> Han
 
 // ===========================================================
 
-async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
+async fn extract_file(bot: &BotType, msg: &Message) -> Result<Vec<u8>> {
     // Check if message has a json attachment
     if msg.document().is_none() {
         bot.send_message_easy(msg.chat.id, "No file sent, operation cancelled")
             .await?;
-        return Err("No file sent".into());
+        bail!("No file sent");
     }
 
     let doc = msg.document().unwrap();
@@ -143,7 +144,7 @@ async fn extract_file(bot: &BotType, msg: &Message) -> HandlerResult<Vec<u8>> {
     if doc.file.size > 50_000_000 {
         bot.send_message_easy(msg.chat.id, "File too large, operation cancelled")
             .await?;
-        return Err("File too large".into());
+        bail!("File too large");
     }
 
     let doc_data = bot.get_file(&doc.file.id).await?;

@@ -1,5 +1,5 @@
-use crate::database::entities::{Entity, EntityType};
-use crate::types::{DbConn, HandlerResult};
+use crate::{database::entities::{Entity, EntityType}, types::DbConn};
+use anyhow::Result;
 use flate2::read::GzDecoder;
 use sqlx::QueryBuilder;
 use std::collections::HashSet;
@@ -7,7 +7,7 @@ use std::io::Read;
 
 use super::types::{BotImport, QSBotImport, ImportItem};
 
-pub async fn quickstickbot_import(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
+pub async fn quickstickbot_import(db: &DbConn, user_id: String, file: Vec<u8>) -> Result<()> {
     // Parse the file
     let qs_import: QSBotImport = serde_json::from_slice(&file)?;
 
@@ -33,7 +33,7 @@ pub async fn quickstickbot_import(db: &DbConn, user_id: String, file: Vec<u8>) -
     Ok(())
 }
 
-pub async fn import(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
+pub async fn import(db: &DbConn, user_id: String, file: Vec<u8>) -> Result<()> {
     let mut decompressor = GzDecoder::new(file.as_slice());
     let mut decompressed = Vec::new();
     decompressor.read_to_end(&mut decompressed)?;
@@ -43,7 +43,7 @@ pub async fn import(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResul
     import_botimport(db, user_id, import).await
 }
 
-async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> HandlerResult {
+async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> Result<()> {
     log::debug!("Importing {} items for user {}", import.len(), user_id);
 
     let mut transaction = db.begin().await?;

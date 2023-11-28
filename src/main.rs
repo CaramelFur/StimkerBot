@@ -1,3 +1,4 @@
+use anyhow::Result;
 use dotenv::dotenv;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::sync::Arc;
@@ -14,7 +15,7 @@ mod types;
 use handlers::inline;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     dotenv().ok();
     pretty_env_logger::init();
 
@@ -98,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn get_db() -> Result<DbType, Box<dyn std::error::Error>> {
+async fn get_db() -> Result<DbType> {
     let database_location =
         std::env::var("DATABASE_LOCATION").expect("DATABASE_LOCATION must be set");
     log::debug!("Database location: {:?}", database_location);

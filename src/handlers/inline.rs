@@ -1,21 +1,17 @@
+use anyhow::Result;
 use std::sync::Arc;
 use teloxide::payloads;
 use teloxide::prelude::*;
 use teloxide::types::*;
 
-use crate::database::EntityType;
 use crate::database::queries;
+use crate::database::EntityType;
 use crate::types::BotType;
 use crate::types::DbConn;
 use crate::types::EntitySort;
-use crate::types::HandlerResult;
 use crate::types::InlineSearchQuery;
 
-pub async fn handler_inline_query(
-    db: Arc<DbConn>,
-    bot: BotType,
-    query: InlineQuery,
-) -> HandlerResult {
+pub async fn handler_inline_query(db: Arc<DbConn>, bot: BotType, query: InlineQuery) -> Result<()> {
     let user_id = query.from.id.to_string();
 
     // Parse query.offset as i32 or fallback to 0
@@ -148,7 +144,7 @@ fn parse_search(input: &String) -> InlineSearchQuery {
 
 // ===================================================================
 
-pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) -> HandlerResult {
+pub async fn handle_inline_choice(db: Arc<DbConn>, query: ChosenInlineResult) -> Result<()> {
     let user_id = query.from.id.to_string();
 
     log::debug!("Chosen inline result: {:?} by user {:?}", query, user_id);
@@ -163,7 +159,7 @@ async fn send_inline_results<I, R>(
     inline_query_id: I,
     results: R,
     next_page: Option<i32>,
-) -> HandlerResult
+) -> Result<()>
 where
     I: Into<String>,
     R: IntoIterator<Item = InlineQueryResult>,
@@ -181,7 +177,7 @@ where
     Ok(())
 }
 
-async fn send_text_result<I, R>(bot: &BotType, inline_query_id: I, text: R) -> HandlerResult
+async fn send_text_result<I, R>(bot: &BotType, inline_query_id: I, text: R) -> Result<()>
 where
     I: Into<String>,
     R: Into<String>,

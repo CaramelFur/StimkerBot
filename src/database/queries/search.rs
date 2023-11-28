@@ -1,4 +1,5 @@
-use sqlx::{Error, QueryBuilder};
+use sqlx::QueryBuilder;
+use anyhow::Result;
 
 use crate::{types::{DbConn, InlineSearchQuery, EntitySort}, database::Entity, util};
 
@@ -7,7 +8,7 @@ pub async fn find_entities(
   user_id: String,
   query: InlineSearchQuery,
   page: i32,
-) -> Result<Vec<Entity>, Error> {
+) -> Result<Vec<Entity>> {
   if query.get_all {
       return list_entities(db, user_id, query.sort, page).await;
   }
@@ -93,7 +94,7 @@ async fn list_entities(
   user_id: String,
   sort: EntitySort,
   page: i32,
-) -> Result<Vec<Entity>, Error> {
+) -> Result<Vec<Entity>> {
   log::debug!("list_entities for user_id: {:?}", user_id);
 
   let result: Vec<Entity> = sqlx::query_as(
