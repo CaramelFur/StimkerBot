@@ -140,11 +140,7 @@ pub async fn remove_tags(
     Ok(())
 }
 
-pub async fn get_tags(
-    db: &DbConn,
-    user_id: String,
-    entity_id: String,
-) -> Result<Vec<String>> {
+pub async fn get_tags(db: &DbConn, user_id: String, entity_id: String) -> Result<Vec<String>> {
     log::debug!(
         "get_tags for entity_id: {:?} and user_id: {:?}",
         entity_id,

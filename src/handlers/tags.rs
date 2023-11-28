@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use anyhow::Result;
+use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::FileMeta;
 
@@ -202,6 +202,8 @@ pub async fn receive_entity_id(
         user_id
     );
 
+    queries::update_file_id(&db, entity.unique_id.to_owned(), entity.id.to_owned()).await?;
+
     let mut current_tags =
         queries::get_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
     current_tags.sort();
@@ -258,10 +260,10 @@ pub async fn receive_entity_tags(
     if msg.text().is_none() {
         bot.send_message_easy(
             msg.chat.id,
-            "Please send me a space seperated list of tags or /cancel",
+            "No tags received, cancelling...",
         )
         .await?;
-        return Ok(());
+        return receive_entity_id(db, bot, dialogue, msg).await;
     }
 
     let user_id = msg.from().unwrap().id.to_string();
