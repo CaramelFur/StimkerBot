@@ -7,10 +7,12 @@ use teloxide::utils::command::BotCommands;
 use types::*;
 
 mod database;
-mod inline;
+mod handlers;
 mod messages;
 mod types;
 mod util;
+
+use handlers::inline;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

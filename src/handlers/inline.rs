@@ -3,7 +3,7 @@ use teloxide::payloads;
 use teloxide::prelude::*;
 use teloxide::types::*;
 
-use crate::database::entities::EntityType;
+use crate::database::EntityType;
 use crate::database::queries;
 use crate::types::BotType;
 use crate::types::DbConn;

@@ -8,7 +8,7 @@ use teloxide::types::{
 };
 use teloxide::utils::command::BotCommands;
 
-use crate::database::entities::EntityType;
+use crate::database::EntityType;
 use crate::database::import;
 use crate::database::queries::{self, InsertEntity};
 use crate::util::{get_unix, unix_to_humantime};
@@ -228,7 +228,7 @@ pub async fn receive_qs_import(
     bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
 
-    let result = database::import::import_qsbot(&db, user_id, file_data).await;
+    let result = import::quickstickbot_import(&db, user_id, file_data).await;
     match result {
         Ok(_) => {
             bot.send_message_easy(msg.chat.id, format!("Imported your entities!"))
@@ -259,7 +259,7 @@ pub async fn receive_bot_import(
     bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
 
-    let result = database::import::import_json(&db, user_id, file_data).await;
+    let result = database::import::import(&db, user_id, file_data).await;
     match result {
         Ok(_) => {
             bot.send_message_easy(msg.chat.id, format!("Imported your entities!"))
@@ -281,7 +281,7 @@ async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerRe
 
     let user_id = msg.from().unwrap().id.to_string();
 
-    let data = import::export_botimport(&db, user_id).await?;
+    let data = import::export(&db, user_id).await?;
 
     bot.send_document(
         msg.chat.id,
@@ -334,7 +334,7 @@ async fn fix_bot_entities(db: &DbConn, bot: &BotType, msg: &Message) -> HandlerR
 
     let progress_message = bot.send_message(msg.chat.id, "Starting...").await?;
 
-    let result = import::fix_entities(db, &bot, &progress_message, user_id.to_owned()).await;
+    let result = import::fix(db, &bot, &progress_message, user_id.to_owned()).await;
 
     if let Err(e) = result {
         bot.send_message_easy(msg.chat.id, format!("Failed to fix your entities"))

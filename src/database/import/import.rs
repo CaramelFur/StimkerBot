@@ -1,34 +1,13 @@
-use crate::types::{BotType, DbConn, EntitySort, HandlerResult, InlineSearchQuery};
+use crate::database::entities::{Entity, EntityType};
+use crate::types::{DbConn, HandlerResult};
 use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use serde;
-use serde::{Deserialize, Serialize};
 use sqlx::QueryBuilder;
 use std::collections::HashSet;
-use std::io::{Read, Write};
-use teloxide::requests::Requester;
-use teloxide::types::Message;
-use teloxide::{ApiError, RequestError};
+use std::io::Read;
 
-use super::entities::{Entity, EntityType};
-use super::queries::find_entities;
+use super::types::{BotImport, QSBotImport, ImportItem};
 
-type QSBotImport = Vec<QSBotImportItem>;
-
-#[derive(Deserialize, Debug)]
-struct QSBotImportItem {
-    id: String,
-    #[serde(rename = "fileId")]
-    file_id: String,
-    tags: Vec<String>,
-    #[serde(rename = "set")]
-    _set: Option<String>,
-    #[serde(rename = "isAnimated")]
-    _is_animated: Option<bool>,
-}
-
-pub async fn import_qsbot(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
+pub async fn quickstickbot_import(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
     // Parse the file
     let qs_import: QSBotImport = serde_json::from_slice(&file)?;
 
@@ -54,29 +33,7 @@ pub async fn import_qsbot(db: &DbConn, user_id: String, file: Vec<u8>) -> Handle
     Ok(())
 }
 
-type BotImport = Vec<ImportItem>;
-
-#[derive(Deserialize, Serialize, Debug)]
-struct ImportItem {
-    #[serde(rename = "id")]
-    entity_id: String,
-
-    #[serde(rename = "fi")]
-    file_id: String,
-    #[serde(rename = "tp")]
-    entity_type: EntityType,
-    #[serde(rename = "t")]
-    tags: Vec<String>,
-
-    #[serde(rename = "c")]
-    count: i64,
-    #[serde(rename = "lu")]
-    last_used: i64,
-    #[serde(rename = "ca")]
-    created_at: i64,
-}
-
-pub async fn import_json(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
+pub async fn import(db: &DbConn, user_id: String, file: Vec<u8>) -> HandlerResult {
     let mut decompressor = GzDecoder::new(file.as_slice());
     let mut decompressed = Vec::new();
     decompressor.read_to_end(&mut decompressed)?;
@@ -227,150 +184,6 @@ async fn import_botimport(db: &DbConn, user_id: String, import: BotImport) -> Ha
     transaction.commit().await?;
 
     log::debug!("[IMPORT] Done");
-
-    Ok(())
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct ExportItem {
-    entity_id: String,
-
-    file_id: String,
-    entity_type: EntityType,
-
-    tags: String,
-
-    count: i64,
-    last_used: i64,
-    created_at: i64,
-}
-
-pub async fn export_botimport(db: &DbConn, user_id: String) -> HandlerResult<Vec<u8>> {
-    log::debug!("Exporting for user {}", user_id);
-
-    let results: Vec<ExportItem> = sqlx::query_as(
-        "SELECT entity_data.entity_id, entity_file.file_id, entity_file.entity_type, group_concat(entity_tag.tag_name, \" \") as tags, entity_data.count, entity_data.last_used, entity_data.created_at FROM entity_main \
-        JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
-        JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
-        JOIN entity_file ON entity_file.entity_id = entity_data.entity_id \
-        WHERE entity_data.user_id = $1 \
-        GROUP BY entity_data.entity_id"
-    ).bind(&user_id).fetch_all(db).await?;
-
-    let import: BotImport = results
-        .into_iter()
-        .map(|item| ImportItem {
-            entity_id: item.entity_id,
-            file_id: item.file_id,
-            entity_type: item.entity_type,
-            tags: item.tags.split(" ").map(|s| s.to_string()).collect(),
-            count: item.count,
-            last_used: item.last_used,
-            created_at: item.created_at,
-        })
-        .collect();
-
-    log::debug!("Exported {} items", import.len());
-
-    let json = serde_json::to_vec(&import)?;
-
-    let mut compressor = GzEncoder::new(Vec::new(), Compression::best());
-    compressor.write_all(json.as_slice())?;
-    let compressed = compressor.finish()?;
-
-    Ok(compressed)
-}
-
-pub async fn fix_entities(
-    db: &DbConn,
-    bot: &BotType,
-    progress_message: &Message,
-    user_id: String,
-) -> HandlerResult<i32> {
-    let mut i: i32 = 0;
-    let mut file_ids_to_remove: Vec<String> = Vec::new();
-    loop {
-        let entities = find_entities(
-            db,
-            user_id.to_owned(),
-            InlineSearchQuery {
-                sort: EntitySort::LastAdded,
-                get_all: true,
-                ..Default::default()
-            },
-            i,
-        )
-        .await?;
-        if entities.len() == 0 {
-            break;
-        }
-
-        bot.edit_message_text(
-            progress_message.chat.id,
-            progress_message.id,
-            format!(
-                "Checking files {}-{}",
-                i * 50 + 1,
-                i * 50 + entities.len() as i32
-            ),
-        )
-        .await?;
-
-        i += 1;
-
-        for entity in entities {
-            log::trace!("Checking file {:?}", entity.file_id);
-            let file = bot.get_file(&entity.file_id).await;
-            if let Err(RequestError::Api(ApiError::Unknown(e))) = &file {
-                if e.contains("wrong file_id") {
-                    file_ids_to_remove.push(entity.file_id);
-                    continue;
-                }
-            }
-            file?;
-        }
-    }
-
-    let fixed = file_ids_to_remove.len() as i32;
-
-    for file_id in file_ids_to_remove {
-        log::info!("Removing file {:?}", file_id);
-        remove_file_id(db, file_id).await?;
-    }
-
-    Ok(fixed)
-}
-
-async fn remove_file_id(db: &DbConn, file_id: String) -> HandlerResult {
-    // Remove the enitity_data with the file_id, and all tables referencing its combo_id
-
-    let mut transaction = db.begin().await?;
-
-    // Delete all entity_main where combo_id is in entity_data with file_id
-    sqlx::query(
-        "DELETE FROM entity_main WHERE combo_id IN \
-        (SELECT combo_id FROM entity_data JOIN entity_file ON entity_file.entity_id = entity_data.entity_id \
-         WHERE entity_file.file_id = $1)")
-        .bind(&file_id)
-        .execute(transaction.as_mut())
-        .await?;
-
-    // Delete all entity_data where entity_id is in entity_file with file_id
-    sqlx::query(
-        "DELETE FROM entity_data WHERE entity_id IN \
-        (SELECT entity_id FROM entity_file WHERE file_id = $1)",
-    )
-    .bind(&file_id)
-    .execute(transaction.as_mut())
-    .await?;
-
-    // Delete all entity_file with file_id
-    sqlx::query("DELETE FROM entity_file WHERE file_id = $1")
-        .bind(&file_id)
-        .execute(transaction.as_mut())
-        .await?;
-
-    transaction.commit().await?;
 
     Ok(())
 }
