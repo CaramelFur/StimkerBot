@@ -18,6 +18,11 @@ pub async fn find_entities(
   let tags_len: i32 = query.tags.len() as i32;
   let negative_tags_len: i32 = query.negative_tags.len() as i32;
 
+  if tags_len == 0 {
+    log::warn!("find_entities called with empty tags");
+    return Ok(vec![]);
+  }
+
   let mut query_builder = QueryBuilder::new(
       "SELECT entity_data.entity_id, entity_data.user_id, entity_file.file_id, entity_file.entity_type FROM entity_main \
       JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
@@ -26,6 +31,11 @@ pub async fn find_entities(
   );
   query_builder.push(" WHERE entity_data.user_id = ");
   query_builder.push_bind(user_id.to_owned());
+
+  if let Some(entity_type) = query.entity_type {
+    query_builder.push(" AND entity_file.entity_type = ");
+    query_builder.push_bind(entity_type.to_owned());
+  }
 
   if query.negative_tags.len() > 0 {
       query_builder.push(

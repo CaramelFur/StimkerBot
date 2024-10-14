@@ -23,7 +23,7 @@ pub async fn verify_stop(
         return Ok(());
     }
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
 
     log::debug!("Wiping user {:?}", user_id);
 

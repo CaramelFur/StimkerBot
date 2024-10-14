@@ -4,7 +4,7 @@ use anyhow::Result;
 use teloxide::{macros::BotCommands, types::{Me, Message}, utils::command::BotCommands as _};
 
 use crate::{types::{DbConn, BotType, DialogueWithState, ConversationState}, database::queries};
-use super::{send_message::BetterSendMessage, import::send_fix_entities};
+use super::{import::send_fix_entities, send_message::BetterSendMessage, tags::send_tags_usage};
 use super::import::send_bot_export;
 
 #[derive(BotCommands)]
@@ -18,6 +18,9 @@ pub enum Command {
 
     #[command(description = "Add or remove tags to an entire stickerpack")]
     Pack,
+
+    #[command(description = "List all your used tags and how many times they were used")]
+    Tags,
 
     #[command(description = "Stop whatever you are doing")]
     Cancel,
@@ -115,6 +118,9 @@ pub async fn receive_command(
             dialogue
                 .update(ConversationState::RecieveEntitiesId)
                 .await?;
+        }
+        Ok(Command::Tags) => {
+            send_tags_usage(db, bot, msg).await?;
         }
         Ok(Command::Export) => {
             send_bot_export(&db, &bot, &msg).await?;

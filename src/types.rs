@@ -33,7 +33,7 @@ pub enum ConversationState {
     ReceiveBotImport,
 }
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum EntitySort {
     LastAdded,
     FirstAdded,
@@ -59,7 +59,7 @@ impl EntitySort {
     }
 }
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct InlineSearchQuery {
     pub tags: Vec<String>,
     pub negative_tags: Vec<String>,

@@ -23,8 +23,8 @@ pub async fn receive_qs_import(
     dialogue.update(ConversationState::ReceiveEntityId).await?;
 
     let file_data = extract_file(&bot, &msg).await?;
-
-    let user_id = msg.from().unwrap().id.to_string();
+    
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
 
     bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
@@ -55,7 +55,7 @@ pub async fn receive_bot_import(
 
     let file_data = extract_file(&bot, &msg).await?;
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
 
     bot.send_message_easy(msg.chat.id, format!("Importing your entities..."))
         .await?;
@@ -80,7 +80,7 @@ pub async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> Resul
     bot.send_message_easy(msg.chat.id, "Exporting your entities...")
         .await?;
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
 
     let data = import::export(&db, user_id).await?;
 
@@ -94,7 +94,7 @@ pub async fn send_bot_export(db: &DbConn, bot: &BotType, msg: &Message) -> Resul
 }
 
 pub async fn send_fix_entities(db: &DbConn, bot: &BotType, msg: &Message) -> Result<()> {
-  let user_id = msg.from().unwrap().id.to_string();
+  let user_id = msg.from.as_ref().unwrap().id.to_string();
 
   let last_fixed_time = queries::get_last_fix_time(db, user_id.clone()).await?;
 

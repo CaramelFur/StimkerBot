@@ -17,7 +17,7 @@ pub async fn handler_inline_query(db: Arc<DbConn>, bot: BotType, query: InlineQu
     // Parse query.offset as i32 or fallback to 0
     let page = query.offset.parse::<i32>().unwrap_or(0);
 
-    // Check if query is empty
+    // Check if query is invalid
     if query.query.len() < 3 {
         log::debug!("Query too short: \"{:?}\" for {:?}", query.query, user_id);
 
@@ -34,6 +34,14 @@ pub async fn handler_inline_query(db: Arc<DbConn>, bot: BotType, query: InlineQu
         user_id,
         page
     );
+
+    log::debug!("Parsed search query: {:?}", search_query);
+
+    // Check if atleast 1 tag is present
+    if search_query.tags.len() == 0 && !search_query.get_all {
+        send_text_result(&bot, query.id, "Please enter atleast 1 normal tag").await?;
+        return Ok(());
+    }
 
     let entities = queries::find_entities(&db, user_id, search_query.to_owned(), page).await?;
 
@@ -193,8 +201,10 @@ where
         payloads::AnswerInlineQuery::new(inline_query_id, results)
             .cache_time(5)
             .is_personal(true)
-            .switch_pm_text("Add a new sticker")
-            .switch_pm_parameter("bot"),
+            .button(InlineQueryResultsButton {
+                text: "Add a new sticker".into(),
+                kind: InlineQueryResultsButtonKind::StartParameter("bot".into()),
+            }),
     )
     .await?;
 

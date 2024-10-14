@@ -83,7 +83,7 @@ pub async fn receive_entities_tags(
         return Ok(());
     }
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
     let tags: Vec<String> = msg
         .text()
         .unwrap()
@@ -193,7 +193,7 @@ pub async fn receive_entity_id(
         return Ok(());
     };
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
 
     log::debug!(
         "Got entity: {:?} file: {:?} from: {:?}",
@@ -205,7 +205,7 @@ pub async fn receive_entity_id(
     queries::update_file_id(&db, entity.unique_id.to_owned(), entity.id.to_owned()).await?;
 
     let mut current_tags =
-        queries::get_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
+        queries::get_tags_for_entity(&db, user_id.clone(), entity.unique_id.clone()).await?;
     current_tags.sort();
 
     log::debug!("Current tags: {:?}", current_tags);
@@ -266,7 +266,7 @@ pub async fn receive_entity_tags(
         return receive_entity_id(db, bot, dialogue, msg).await;
     }
 
-    let user_id = msg.from().unwrap().id.to_string();
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
     let mut tags: Vec<String> = msg
         .text()
         .unwrap()
@@ -335,7 +335,7 @@ pub async fn receive_entity_tags(
     )
     .await?;
 
-    tags = queries::get_tags(&db, user_id.clone(), entity.unique_id.clone()).await?;
+    tags = queries::get_tags_for_entity(&db, user_id.clone(), entity.unique_id.clone()).await?;
     tags.sort();
 
     log::debug!("New tags for user {:?} is {:?}", user_id, tags);
@@ -346,5 +346,42 @@ pub async fn receive_entity_tags(
     )
     .await?;
     dialogue.update(ConversationState::ReceiveEntityId).await?;
+    Ok(())
+}
+
+pub async fn send_tags_usage(
+    db: Arc<DbConn>,
+    bot: BotType,
+    msg: Message,
+) -> Result<()> {
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
+    let tags = queries::get_tags_and_usage(&db, user_id.clone()).await?;
+    let mut current_message: String = "<b>Your tags:</b>\n".to_string();
+    let mut messages: Vec<String> = vec![];
+
+    let tags_len = tags.len();
+    for tag in tags {
+        let next_line = format!(
+            "{} - {}\n",
+            tag.tag_name, tag.usage
+        );
+
+        if current_message.len() + next_line.len() > 4096 {
+            messages.push(current_message);
+            current_message = next_line;
+        } else {
+            current_message += &next_line;
+        }
+    }
+    messages.push(current_message);
+
+    if tags_len == 500 {
+        messages.push("You have more tags than can be displayed here. Please use /export to get a list of all your tags".to_string());
+    }
+
+    for message in messages {
+        bot.send_message_easy(msg.chat.id, message).await?;
+    }
+
     Ok(())
 }

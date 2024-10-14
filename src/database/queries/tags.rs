@@ -5,6 +5,11 @@ use crate::{database::EntityType, types::DbConn, util};
 
 use super::InsertEntity;
 
+pub struct TagUsage {
+    pub tag_name: String,
+    pub usage: i32,
+}
+
 pub async fn insert_tags(
     db: &DbConn,
     user_id: String,
@@ -140,9 +145,13 @@ pub async fn remove_tags(
     Ok(())
 }
 
-pub async fn get_tags(db: &DbConn, user_id: String, entity_id: String) -> Result<Vec<String>> {
+pub async fn get_tags_for_entity(
+    db: &DbConn,
+    user_id: String,
+    entity_id: String,
+) -> Result<Vec<String>> {
     log::debug!(
-        "get_tags for entity_id: {:?} and user_id: {:?}",
+        "get_tags_for_entity: {:?} and user_id: {:?}",
         entity_id,
         user_id
     );
@@ -164,6 +173,30 @@ pub async fn get_tags(db: &DbConn, user_id: String, entity_id: String) -> Result
         .collect();
 
     log::debug!("get_tags result: {:?}", result);
+
+    Ok(result)
+}
+
+pub async fn get_tags_and_usage(db: &DbConn, user_id: String) -> Result<Vec<TagUsage>> {
+    log::debug!("get_tags_and_usage for user_id: {:?}", user_id);
+
+    let result: Vec<(String, i32)> = sqlx::query_as(
+        "SELECT tag_name, COUNT(entity_main.combo_id) as usage FROM entity_main \
+      JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
+      JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
+      WHERE entity_data.user_id = $1 \
+      GROUP BY entity_main.tag_id \
+      ORDER BY usage DESC \
+      LIMIT 500",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await?;
+
+    let result: Vec<TagUsage> = result
+        .into_iter()
+        .map(|(tag_name, usage)| TagUsage { tag_name, usage })
+        .collect();
 
     Ok(result)
 }

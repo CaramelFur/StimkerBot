@@ -1,6 +1,6 @@
 use teloxide::{
-    payloads::{SendMessage, SendMessageSetters},
-    requests::{JsonRequest, Requester},
+    payloads::SendMessageSetters,
+    requests::Requester,
     types::{KeyboardButton, KeyboardMarkup, KeyboardRemove, Recipient, ReplyMarkup},
 };
 
@@ -12,13 +12,13 @@ pub trait BetterSendMessage {
         chat_id: C,
         text: T,
         buttons: Vec<S>,
-    ) -> JsonRequest<SendMessage>
+    ) -> <BotType as Requester>::SendMessage
     where
         C: Into<Recipient>,
         T: Into<String>,
         S: Into<String>;
 
-    fn send_message_easy<C, T>(&self, chat_id: C, text: T) -> JsonRequest<SendMessage>
+    fn send_message_easy<C, T>(&self, chat_id: C, text: T) -> <BotType as Requester>::SendMessage
     where
         C: Into<Recipient>,
         T: Into<String>,
@@ -33,7 +33,7 @@ impl BetterSendMessage for BotType {
         chat_id: C,
         text: T,
         buttons: Vec<S>,
-    ) -> JsonRequest<SendMessage>
+    ) -> <BotType as Requester>::SendMessage
     where
         C: Into<Recipient>,
         T: Into<String>,
@@ -51,8 +51,8 @@ impl BetterSendMessage for BotType {
 
             message = message.reply_markup(ReplyMarkup::Keyboard(
                 KeyboardMarkup::new(vec![buttons])
-                    .resize_keyboard(true)
-                    .one_time_keyboard(true),
+                    .resize_keyboard()
+                    .one_time_keyboard(),
             ));
         }
 

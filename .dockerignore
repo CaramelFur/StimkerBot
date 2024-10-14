@@ -4,3 +4,5 @@ target
 .env
 build.sh
 Dockerfile
+.idea
+.vscode
