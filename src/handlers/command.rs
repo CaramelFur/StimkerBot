@@ -1,63 +1,72 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use teloxide::{macros::BotCommands, types::{Me, Message}, utils::command::BotCommands as _};
+use teloxide::{
+  macros::BotCommands,
+  types::{Me, Message},
+  utils::command::BotCommands as _,
+};
 
-use crate::{types::{DbConn, BotType, DialogueWithState, ConversationState}, database::queries};
-use super::{import::send_fix_entities, send_message::BetterSendMessage, tags::send_tags_usage};
 use super::import::send_bot_export;
+use super::{import::send_fix_entities, send_message::BetterSendMessage, tags::send_tags_usage};
+use crate::{
+  database::queries,
+  types::{BotType, ConversationState, DbConn, DialogueWithState},
+};
 
 #[derive(BotCommands)]
 #[command(rename_rule = "lowercase")]
 pub enum Command {
-    #[command(description = "Show all help for this bot")]
-    Help,
+  #[command(description = "Show all help for this bot")]
+  Help,
 
-    #[command(description = "Start using this bot")]
-    Start,
+  #[command(description = "Start using this bot")]
+  Start,
 
-    #[command(description = "Add or remove tags to an entire stickerpack")]
-    Pack,
+  #[command(description = "Add or remove tags to an entire stickerpack")]
+  Pack,
 
-    #[command(description = "List all your used tags and how many times they were used")]
-    Tags,
+  #[command(description = "List all your used tags and how many times they were used")]
+  Tags,
 
-    #[command(description = "Stop whatever you are doing")]
-    Cancel,
+  #[command(description = "Stop whatever you are doing")]
+  Cancel,
 
-    #[command(description = "Export your data")]
-    Export,
+  #[command(description = "Export your data")]
+  Export,
 
-    #[command(description = "Import your data")]
-    Import,
+  #[command(description = "Import your data")]
+  Import,
 
-    #[command(description = "Import your data from a QuickStickBot or QuickGifBot export")]
-    QSImport,
+  #[command(description = "Import your data from a QuickStickBot or QuickGifBot export")]
+  QSImport,
 
-    #[command(description = "If stickerbot is not longer working, try this. (This is a slow operation, use sparingly)")]
-    FixEntities,
+  #[command(
+    description = "If stickerbot is not longer working, try this. (This is a slow operation, use sparingly)"
+  )]
+  FixEntities,
 
-    #[command(description = "Shows global statistics about this bot")]
-    Stats,
+  #[command(description = "Shows global statistics about this bot")]
+  Stats,
 
-    #[command(description = "Shows information about this bot")]
-    About,
+  #[command(description = "Shows information about this bot")]
+  About,
 
-    #[command(description = "DANGEROUS! Wipes your data")]
-    Stop,
+  #[command(description = "DANGEROUS! Wipes your data")]
+  Stop,
 }
 
 pub async fn receive_command(
-    db: Arc<DbConn>,
-    bot: BotType,
-    me: Me,
-    dialogue: DialogueWithState,
-    msg: Message,
+  db: Arc<DbConn>,
+  bot: BotType,
+  me: Me,
+  dialogue: DialogueWithState,
+  msg: Message,
 ) -> Result<()> {
-    match Command::parse(msg.text().unwrap(), me.username()) {
-        Ok(Command::Help) => {
-            let command_help = Command::descriptions().to_string();
-            bot.send_message_easy(
+  match Command::parse(msg.text().unwrap(), me.username()) {
+    Ok(Command::Help) => {
+      let command_help = Command::descriptions().to_string();
+      bot.send_message_easy(
                 msg.chat.id,
                 format!(
                     "<b>General</b>\n\
@@ -93,70 +102,76 @@ pub async fn receive_command(
                 ),
             )
             .await?;
-        }
-        Ok(Command::Start) => {
-            bot.send_message_easy(
-                msg.chat.id,
-                "You can start using this bot by sending it a sticker, gif, photo or video.\n\
+    }
+    Ok(Command::Start) => {
+      bot
+        .send_message_easy(
+          msg.chat.id,
+          "You can start using this bot by sending it a sticker, gif, photo or video.\n\
                 You can also use /help to get more information",
-            )
-            .await?;
-        }
-        Ok(Command::Pack) => {
-            if dialogue.get().await?.unwrap() != ConversationState::ReceiveEntityId {
-                bot.send_message_easy(msg.chat.id, "Please finish your action, or /cancel")
-                    .await?;
-                return Ok(());
-            }
+        )
+        .await?;
+    }
+    Ok(Command::Pack) => {
+      if dialogue.get().await?.unwrap() != ConversationState::ReceiveEntityId {
+        bot
+          .send_message_easy(msg.chat.id, "Please finish your action, or /cancel")
+          .await?;
+        return Ok(());
+      }
 
-            bot.send_message_easy(
-                msg.chat.id,
-                "Please send me a sticker from the pack you want to tag",
-            )
-            .await?;
+      bot
+        .send_message_easy(
+          msg.chat.id,
+          "Please send me a sticker from the pack you want to tag",
+        )
+        .await?;
 
-            dialogue
-                .update(ConversationState::RecieveEntitiesId)
-                .await?;
-        }
-        Ok(Command::Tags) => {
-            send_tags_usage(db, bot, msg).await?;
-        }
-        Ok(Command::Export) => {
-            send_bot_export(&db, &bot, &msg).await?;
-        }
-        Ok(Command::Import) => {
-            bot.send_message_buttons(
-                msg.chat.id,
-                "Ready to import, please send me the file you got from /export",
-                vec!["/cancel"],
-            )
-            .await?;
-            dialogue.update(ConversationState::ReceiveBotImport).await?;
-        }
-        Ok(Command::QSImport) => {
-            bot.send_message_buttons(
-                msg.chat.id,
-                "Ready to import, please send me the file you got from QuickStickBot",
-                vec!["/cancel"],
-            )
-            .await?;
+      dialogue
+        .update(ConversationState::RecieveEntitiesId)
+        .await?;
+    }
+    Ok(Command::Tags) => {
+      send_tags_usage(db, bot, msg).await?;
+    }
+    Ok(Command::Export) => {
+      send_bot_export(&db, &bot, &msg).await?;
+    }
+    Ok(Command::Import) => {
+      bot
+        .send_message_buttons(
+          msg.chat.id,
+          "Ready to import, please send me the file you got from /export",
+          vec!["/cancel"],
+        )
+        .await?;
+      dialogue.update(ConversationState::ReceiveBotImport).await?;
+    }
+    Ok(Command::QSImport) => {
+      bot
+        .send_message_buttons(
+          msg.chat.id,
+          "Ready to import, please send me the file you got from QuickStickBot",
+          vec!["/cancel"],
+        )
+        .await?;
 
-            dialogue.update(ConversationState::ReceiveQSImport).await?;
-        }
-        Ok(Command::FixEntities) => {
-            send_fix_entities(&db, &bot, &msg).await?;
-        }
-        Ok(Command::Cancel) => {
-            dialogue.update(ConversationState::ReceiveEntityId).await?;
-            bot.send_message_easy(msg.chat.id, "Cancelled").await?;
-        }
-        Ok(Command::Stats) => {
-            let stats = queries::get_global_stats(&db).await?;
-            bot.send_message_easy(
-                msg.chat.id,
-                format!(
-                    "<b>Global stats</b>\n\
+      dialogue.update(ConversationState::ReceiveQSImport).await?;
+    }
+    Ok(Command::FixEntities) => {
+      send_fix_entities(&db, &bot, &msg).await?;
+    }
+    Ok(Command::Cancel) => {
+      dialogue.update(ConversationState::ReceiveEntityId).await?;
+      bot.send_message_easy(msg.chat.id, "Cancelled").await?;
+    }
+    Ok(Command::Stats) => {
+      let stats = queries::get_global_stats(&db).await?;
+      bot
+        .send_message_easy(
+          msg.chat.id,
+          format!(
+            "<b>Global stats</b>\n\
                     Users: <code>{}</code>\n\
                     Tags: <code>{}</code>\n\
                     Sent: <code>{}</code>\n\
@@ -167,23 +182,20 @@ pub async fn receive_command(
                     Animations: <code>{}</code>\n\
                     Photos: <code>{}</code>\n\
                     Videos: <code>{}</code>",
-                    stats.total_users,
-                    stats.total_tags,
-                    stats.total_entities_sent,
-                    stats.total_stickers
-                        + stats.total_animations
-                        + stats.total_photos
-                        + stats.total_videos,
-                    stats.total_stickers,
-                    stats.total_animations,
-                    stats.total_photos,
-                    stats.total_videos,
-                ),
-            )
-            .await?;
-        }
-        Ok(Command::About) => {
-            bot.send_message_easy(
+            stats.total_users,
+            stats.total_tags,
+            stats.total_entities_sent,
+            stats.total_stickers + stats.total_animations + stats.total_photos + stats.total_videos,
+            stats.total_stickers,
+            stats.total_animations,
+            stats.total_photos,
+            stats.total_videos,
+          ),
+        )
+        .await?;
+    }
+    Ok(Command::About) => {
+      bot.send_message_easy(
                 msg.chat.id,
                 format!(
                     "<b>Stimkerbot V{}</b>\n\
@@ -193,21 +205,23 @@ pub async fn receive_command(
                 ),
             )
             .await?;
-        }
-        Ok(Command::Stop) => {
-            bot.send_message_buttons(
-                msg.chat.id,
-                "Please send 'I WANT TO DELETE EVERYTHING' to confirm",
-                vec!["/cancel"],
-            )
-            .await?;
-            dialogue.update(ConversationState::VerifyStop).await?;
-        }
-        Err(_) => {
-            bot.send_message_easy(msg.chat.id, "Unknown command")
-                .await?;
-        }
     }
+    Ok(Command::Stop) => {
+      bot
+        .send_message_buttons(
+          msg.chat.id,
+          "Please send 'I WANT TO DELETE EVERYTHING' to confirm",
+          vec!["/cancel"],
+        )
+        .await?;
+      dialogue.update(ConversationState::VerifyStop).await?;
+    }
+    Err(_) => {
+      bot
+        .send_message_easy(msg.chat.id, "Unknown command")
+        .await?;
+    }
+  }
 
-    return Ok(());
+  return Ok(());
 }

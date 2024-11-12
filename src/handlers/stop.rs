@@ -4,33 +4,35 @@ use anyhow::Result;
 use teloxide::types::Message;
 
 use crate::{
-    database::queries,
-    handlers::send_message::BetterSendMessage as _,
-    types::{BotType, ConversationState, DbConn, DialogueWithState},
+  database::queries,
+  handlers::send_message::BetterSendMessage as _,
+  types::{BotType, ConversationState, DbConn, DialogueWithState},
 };
 
 pub async fn verify_stop(
-    db: Arc<DbConn>,
-    bot: BotType,
-    dialogue: DialogueWithState,
-    msg: Message,
+  db: Arc<DbConn>,
+  bot: BotType,
+  dialogue: DialogueWithState,
+  msg: Message,
 ) -> Result<()> {
-    dialogue.update(ConversationState::ReceiveEntityId).await?;
+  dialogue.update(ConversationState::ReceiveEntityId).await?;
 
-    if msg.text().is_none() || msg.text().unwrap() != "I WANT TO DELETE EVERYTHING" {
-        bot.send_message_easy(msg.chat.id, "Stop action cancelled")
-            .await?;
-        return Ok(());
-    }
+  if msg.text().is_none() || msg.text().unwrap() != "I WANT TO DELETE EVERYTHING" {
+    bot
+      .send_message_easy(msg.chat.id, "Stop action cancelled")
+      .await?;
+    return Ok(());
+  }
 
-    let user_id = msg.from.as_ref().unwrap().id.to_string();
+  let user_id = msg.from.as_ref().unwrap().id.to_string();
 
-    log::debug!("Wiping user {:?}", user_id);
+  log::debug!("Wiping user {:?}", user_id);
 
-    queries::wipe_user(&db, user_id.clone()).await?;
+  queries::wipe_user(&db, user_id.clone()).await?;
 
-    bot.send_message_easy(msg.chat.id, "All your data has been wiped")
-        .await?;
+  bot
+    .send_message_easy(msg.chat.id, "All your data has been wiped")
+    .await?;
 
-    Ok(())
+  Ok(())
 }

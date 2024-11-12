@@ -1,7 +1,11 @@
-use sqlx::QueryBuilder;
 use anyhow::Result;
+use sqlx::QueryBuilder;
 
-use crate::{types::{DbConn, InlineSearchQuery, EntitySort}, database::Entity, util};
+use crate::{
+  database::Entity,
+  types::{DbConn, EntitySort, InlineSearchQuery},
+  util,
+};
 
 pub async fn find_entities(
   db: &DbConn,
@@ -10,7 +14,7 @@ pub async fn find_entities(
   page: i32,
 ) -> Result<Vec<Entity>> {
   if query.get_all {
-      return list_entities(db, user_id, query.sort, page).await;
+    return list_entities(db, user_id, query.sort, page).await;
   }
 
   log::debug!("find_entities: {:?} for user_id: {:?}", query.tags, user_id);
@@ -29,65 +33,72 @@ pub async fn find_entities(
       JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
       JOIN entity_file ON entity_file.entity_id = entity_data.entity_id",
   );
-  query_builder.push(" WHERE entity_data.user_id = ");
-  query_builder.push_bind(user_id.to_owned());
+  query_builder
+    .push(" WHERE entity_data.user_id = ")
+    .push_bind(user_id.to_owned());
 
   if let Some(entity_type) = query.entity_type {
-    query_builder.push(" AND entity_file.entity_type = ");
-    query_builder.push_bind(entity_type.to_owned());
+    query_builder
+      .push(" AND entity_file.entity_type = ")
+      .push_bind(entity_type.to_owned());
   }
 
   if query.negative_tags.len() > 0 {
-      query_builder.push(
-          "AND entity_data.entity_id NOT IN ( \
+    query_builder
+      .push(
+        "AND entity_data.entity_id NOT IN ( \
               SELECT entity_data.entity_id FROM entity_main \
               JOIN entity_tag ON entity_tag.tag_id = entity_main.tag_id \
             JOIN entity_data ON entity_data.combo_id = entity_main.combo_id \
               WHERE entity_data.user_id = ",
-      );
-      query_builder.push_bind(user_id.to_owned());
-      query_builder.push(" AND (");
-      let mut seperator_builder = query_builder.separated("OR");
-      query.negative_tags.into_iter().for_each(|tag_name| {
-          let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
-          let needs_escape = escaped_tag != tag_name;
-          escaped_tag += "%";
+      )
+      .push_bind(user_id.to_owned())
+      .push(" AND (");
+    let mut seperator_builder = query_builder.separated("OR");
+    query.negative_tags.into_iter().for_each(|tag_name| {
+      let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
+      let needs_escape = escaped_tag != tag_name;
+      escaped_tag += "%";
 
-          seperator_builder.push(" entity_tag.tag_name LIKE ");
-          seperator_builder.push_bind_unseparated(escaped_tag);
+      seperator_builder
+        .push(" entity_tag.tag_name LIKE ")
+        .push_bind_unseparated(escaped_tag);
 
-          if needs_escape {
-              seperator_builder.push_unseparated(" ESCAPE '\\' ");
-          }
-      });
-      query_builder.push(")");
-      query_builder.push("GROUP BY entity_main.combo_id HAVING COUNT(entity_tag.tag_name) >= ");
-      query_builder.push_bind(negative_tags_len);
-      query_builder.push(")");
+      if needs_escape {
+        seperator_builder.push_unseparated(" ESCAPE '\\' ");
+      }
+    });
+    query_builder
+      .push(")")
+      .push("GROUP BY entity_main.combo_id HAVING COUNT(entity_tag.tag_name) >= ")
+      .push_bind(negative_tags_len)
+      .push(")");
   }
 
   query_builder.push(" AND (");
   let mut seperator_builder = query_builder.separated("OR");
   query.tags.into_iter().for_each(|tag_name| {
-      let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
-      let needs_escape = escaped_tag != tag_name;
-      escaped_tag += "%";
+    let mut escaped_tag = tag_name.replace("_", "\\_").replace("%", "\\%");
+    let needs_escape = escaped_tag != tag_name;
+    escaped_tag += "%";
 
-      seperator_builder.push(" entity_tag.tag_name LIKE ");
-      seperator_builder.push_bind_unseparated(escaped_tag);
+    seperator_builder
+      .push(" entity_tag.tag_name LIKE ")
+      .push_bind_unseparated(escaped_tag);
 
-      if needs_escape {
-          seperator_builder.push_unseparated(" ESCAPE '\\' ");
-      }
+    if needs_escape {
+      seperator_builder.push_unseparated(" ESCAPE '\\' ");
+    }
   });
-  query_builder.push(")");
-  query_builder.push(" GROUP BY entity_main.combo_id"); // Since we filter by user, this is possible
-  query_builder.push(" HAVING COUNT(entity_tag.tag_name) >= ");
-  query_builder.push_bind(tags_len);
-  query_builder.push(" ORDER BY ");
-  query_builder.push(query.sort.to_sql());
-  query_builder.push(" LIMIT 50 OFFSET ");
-  query_builder.push_bind(page * 50);
+  query_builder
+    .push(")")
+    .push(" GROUP BY entity_main.combo_id") // Since we filter by user, this is possible
+    .push(" HAVING COUNT(entity_tag.tag_name) >= ")
+    .push_bind(tags_len)
+    .push(" ORDER BY ")
+    .push(query.sort.to_sql())
+    .push(" LIMIT 50 OFFSET ")
+    .push_bind(page * 50);
 
   let start_time = util::get_unix();
   let result: Vec<Entity> = query_builder.build_query_as().fetch_all(db).await?;

@@ -1,5 +1,5 @@
 mod entities;
-pub mod queries;
 pub mod import;
+pub mod queries;
 
 pub use entities::*;

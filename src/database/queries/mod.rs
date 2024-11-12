@@ -1,15 +1,15 @@
-mod types;
-mod tags;
-mod users;
-mod search;
+mod entities;
 mod entity_stats;
 mod global_stats;
-mod entities;
+mod search;
+mod tags;
+mod types;
+mod users;
 
-pub use types::*;
-pub use tags::*;
-pub use users::*;
-pub use search::*;
 pub use entities::*;
 pub use entity_stats::*;
 pub use global_stats::*;
+pub use search::*;
+pub use tags::*;
+pub use types::*;
+pub use users::*;

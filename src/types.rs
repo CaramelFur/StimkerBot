@@ -1,8 +1,8 @@
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use teloxide::{
-    adaptors::DefaultParseMode, dispatching::dialogue::InMemStorage, prelude::Dialogue,
-    types::FileMeta, Bot,
+  adaptors::DefaultParseMode, dispatching::dialogue::InMemStorage, prelude::Dialogue,
+  types::FileMeta, Bot,
 };
 
 use crate::database::EntityType;
@@ -15,55 +15,55 @@ pub type DbType = Arc<DbConn>;
 
 #[derive(Clone, Default, PartialEq)]
 pub enum ConversationState {
-    #[default]
-    ReceiveEntityId,
-    ReceiveEntityTags {
-        entity: FileMeta,
-        entity_type: EntityType,
-    },
+  #[default]
+  ReceiveEntityId,
+  ReceiveEntityTags {
+    entity: FileMeta,
+    entity_type: EntityType,
+  },
 
-    VerifyStop,
+  VerifyStop,
 
-    RecieveEntitiesId,
-    RecieveEntitiesTags {
-        entities: Vec<FileMeta>,
-    },
+  RecieveEntitiesId,
+  RecieveEntitiesTags {
+    entities: Vec<FileMeta>,
+  },
 
-    ReceiveQSImport,
-    ReceiveBotImport,
+  ReceiveQSImport,
+  ReceiveBotImport,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum EntitySort {
-    LastAdded,
-    FirstAdded,
-    LastUsed,
-    FirstUsed,
-    #[default]
-    MostUsed,
-    LeastUsed,
-    Random,
+  LastAdded,
+  FirstAdded,
+  LastUsed,
+  FirstUsed,
+  #[default]
+  MostUsed,
+  LeastUsed,
+  Random,
 }
 
 impl EntitySort {
-    pub fn to_sql(&self) -> &'static str {
-        match self {
-            EntitySort::LastAdded => "entity_data.created_at DESC",
-            EntitySort::FirstAdded => "entity_data.created_at ASC",
-            EntitySort::LastUsed => "entity_data.last_used DESC",
-            EntitySort::FirstUsed => "entity_data.last_used ASC",
-            EntitySort::MostUsed => "entity_data.count DESC",
-            EntitySort::LeastUsed => "entity_data.count ASC",
-            EntitySort::Random => "RANDOM()",
-        }
+  pub fn to_sql(&self) -> &'static str {
+    match self {
+      EntitySort::LastAdded => "entity_data.created_at DESC",
+      EntitySort::FirstAdded => "entity_data.created_at ASC",
+      EntitySort::LastUsed => "entity_data.last_used DESC",
+      EntitySort::FirstUsed => "entity_data.last_used ASC",
+      EntitySort::MostUsed => "entity_data.count DESC",
+      EntitySort::LeastUsed => "entity_data.count ASC",
+      EntitySort::Random => "RANDOM()",
     }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InlineSearchQuery {
-    pub tags: Vec<String>,
-    pub negative_tags: Vec<String>,
-    pub sort: EntitySort,
-    pub entity_type: Option<EntityType>,
-    pub get_all: bool,
+  pub tags: Vec<String>,
+  pub negative_tags: Vec<String>,
+  pub sort: EntitySort,
+  pub entity_type: Option<EntityType>,
+  pub get_all: bool,
 }
