@@ -16,13 +16,16 @@ pub enum EntityType {
 pub struct Entity {
   pub entity_id: String,
   pub file_id: String,
+  #[allow(dead_code)]
   pub user_id: String,
   pub entity_type: EntityType,
 }
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct EntityStat {
+  #[allow(dead_code)]
   pub user_id: String,
+  #[allow(dead_code)]
   pub entity_id: String,
   pub count: i64,
   pub last_used: i64,
